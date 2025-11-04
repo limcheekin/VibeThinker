@@ -8,9 +8,9 @@
 
 VibeThinker-1.5B is a 1.5B-parameter dense model that challenges the prevailing notion that small models inherently lack robust reasoning capabilities. Developed with an innovative post-training methodology centered on the **"Spectrum-to-Signal Principle (SSP)"**, our model achieves reasoning performance comparable to models hundreds of times larger.
 
-<p align="center"><img src="./figures/ling-miniv2-eval.png" /></p>
+<p align="center"><img src="./figures/vt1.5b_eval.png" /></p>
 
-## 🚀 Key Features
+## Key Features
 
 - **Ultra-Efficient**: Only 1.5B parameters - 100× to 600× smaller than giants like Kimi K2 (1000B+) and DeepSeek R1 (671B)
 - **Cost-Effective**: Total training cost of **$7,800**
