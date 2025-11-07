@@ -37,6 +37,12 @@ Most remarkably, VibeThinker-1.5B surpasses the initial DeepSeek R1 model—whic
 
 The model checkpoint is available at: [Hugging Face](https://huggingface.co/WeiboAI/VibeThinker-1.5B)
 
+## Eval
+
+We have prepared the evaluation program and a usage guide, which you can obtain from the eval folder. 
+
+Math veal -> [Here](https://github.com/WeiboAI/VibeThinker/blob/main/eval/README.md).
+
 ## License
 
 This code repository is licensed under [the MIT License](https://github.com/WeiboAI/VibeThinker/blob/main/LICENSE).
