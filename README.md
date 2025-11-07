@@ -11,7 +11,7 @@ models like GPT OSS-20B Medium.
 
 Most remarkably, VibeThinker-1.5B surpasses the initial DeepSeek R1 model—which is over 400 times larger—across three challenging mathematical benchmarks: AIME24 (80.3 vs. 79.8), AIME25 (74.4 vs. 70.0), and HMMT25 (50.4 vs. 41.7).
 
-<p align="center"><img src="./figures/vibethinker_eval.png" /></p>
+<p align="center"><img src="./figures/vibethinker_eval2.png" /></p>
 
 ## News
 [2025.11.05] 📢📢📢 VibeThinker-1.5B will be open-sourced soon. Stay tuned!
