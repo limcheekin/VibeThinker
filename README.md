@@ -39,11 +39,7 @@ The model checkpoint is available at: [Hugging Face](https://huggingface.co/Weib
 
 ## Eval
 
-The evaluation program and usage guide have been prepared and are available at the following link.
-
-Math eval -> [Here](./eval/math/README.md).
-
-Code eval -> [Here](./eval/code/README.md).
+The evaluation program and usage guide have been prepared and are available at the following links: [Math Eval](./eval/math/README.md)​ and [Code Eval](./eval/code/README.md).
 
 ## License
 
