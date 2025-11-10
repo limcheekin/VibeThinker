@@ -35,11 +35,11 @@ Most remarkably, VibeThinker-1.5B surpasses the initial DeepSeek R1 model—whic
 
 ## Model Downloads
 
-The model checkpoint is available at: [Hugging Face](https://huggingface.co/WeiboAI/VibeThinker-1.5B)
+The model checkpoint is available at: [Hugging Face](https://huggingface.co/WeiboAI/VibeThinker-1.5B) and [ModelScope](https://modelscope.cn/models/WeiboAI/VibeThinker-1.5B).
 
 ## Eval
 
-The evaluation program and usage guide have been prepared and are available at the following links: [Math Eval](./eval/math/README.md)​ and [Code Eval](./eval/code/README.md).
+If you wish to reproduce the results reported in our technical report, the evaluation program and usage guide have been prepared and are available at the following links.: [Math Eval](./eval/math/README.md)​ and [Code Eval](./eval/code/README.md).
 
 ## Usage Guidelines
 
@@ -52,8 +52,6 @@ To facilitate quick verification by the community, we recommend the following pa
 Required: **transformers>=4.54.0**
 
 Recommended for better inference performance: **vLLM==0.10.1 or SGLang>=0.4.9.post6**
-
-Models with safetensors format can be downloaded from [HuggingFace](https://huggingface.co/WeiboAI/VibeThinker-1.5B) or [ModelScope](https://modelscope.cn/models/WeiboAI/VibeThinker-1.5B). 
 
 Here is a code snippet to show you how to use the chat model with transformers:
 
