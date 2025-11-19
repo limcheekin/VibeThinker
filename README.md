@@ -3,7 +3,6 @@
 
 <p align="center">🤗 <a href="https://huggingface.co/WeiboAI">Hugging Face</a>&nbsp&nbsp | &nbsp&nbsp🤖 <a href="https://modelscope.cn/organization/WeiboAI">Model Scope</a> &nbsp  |  &nbsp&nbsp📄  <a href="https://huggingface.co/papers/2511.06221">Techical Report</a> |  &nbsp&nbsp🏆  <a href="https://arxiv.org/abs/2511.06221">arxiv paper</a></p> 
 
-
 ## Introduction
 
 VibeThinker-1.5B is a 1.5B-parameter dense model that challenges the prevailing notion that small models inherently lack robust reasoning capabilities. Developed with an innovative post-training methodology centered on the **"Spectrum-to-Signal Principle (SSP)"**, VibeThinker-1.5B demonstrates superior reasoning capabilities compared to closed-source models Magistral Medium and Claude Opus 4, while achieving performance on par with open-source
@@ -14,6 +13,8 @@ Most remarkably, VibeThinker-1.5B surpasses the initial DeepSeek R1 model—whic
 <p align="center"><img src="./figures/vibethinker_eval2.png" /></p>
 
 ## News
+[2025.11.19] 🔥🔥VibeThinker-1.5B hit #1 on huggingface’s trending models today! 
+
 [2025.11.11] 🎉🎉🎉 VibeThinker-1.5B is now open source! The model weights and technical report can be accessed via the links at the top.
 
 [2025.11.05] 📢📢📢 VibeThinker-1.5B will be open-sourced soon. Stay tuned!
@@ -42,7 +43,6 @@ The model checkpoint is available at: [Hugging Face](https://huggingface.co/Weib
 ## Eval
 
 If you wish to reproduce the results reported in our technical report, the evaluation program and usage guide have been prepared and are available at the following links.: [Math Eval](./eval/math/README.md)​ and [Code Eval](./eval/code/README.md).
-
 
 Sample responses from some benchmarks:[here](https://drive.google.com/drive/folders/1qom754QSjujDI98Wv8LIKTaTszPkAN6q?usp=drive_link).
 
