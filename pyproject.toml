@@ -1,0 +1,44 @@
+[project]
+name = "vibethinker"
+version = "0.1.0"
+description = "An implementation of the VibeThinker model."
+authors = [{ name = "Jules", email = "jules@example.com" }]
+requires-python = ">=3.11"
+dependencies = [
+    "torch",
+    "matplotlib",
+    "numpy",
+    "psutil",
+    "seaborn",
+    "transformers",
+    "datasets",
+    "unsloth",
+    "llama-cpp-python",
+    "optimum",
+    "sympy"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "black",
+    "isort",
+    "mypy",
+    "flake8"
+]
+
+[tool.setuptools]
+packages = ["vibethinker"]
+package-dir = { "" = "src" }
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
