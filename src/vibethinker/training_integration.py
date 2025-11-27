@@ -89,7 +89,7 @@ def train_signal_phase_with_mgpo(
                             eos_token_id=tokenizer.eos_token_id,
                         )
                     completion = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                    completion = completion[len(prompt_text) :].strip()
+                    completion = completion[len(prompt_text):].strip()
                     problem_completions.append(completion)
                 all_completions.append(problem_completions)
             batch_dict: Dict[str, Any] = {
