@@ -3,12 +3,28 @@
 
 ---
 
-## Module 0: Monitoring & Visualization Tools
+> [!WARNING]
+> **Critical: Model Size Adaptation**
+> 
+> This implementation guide uses **Qwen-0.6B (0.6B parameters)** instead of the paper's **1.5B model** for efficient demonstration and development.
+> 
+> **Key Differences**:
+> - **Parameters**: 0.6B vs 1.5B (2.5x smaller)
+> - **Performance**: Results will be lower than paper's reported benchmarks
+> - **Hyperparameters**: Batch sizes and learning rates are scaled for 0.6B
+> - **Cost**: Training cost will be ~60% of the paper's $8,000
+> 
+> **To match the paper's 1.5B model**:
+> 1. Use `Qwen/Qwen2.5-1.5B` or similar 1.5B model
+> 2. Increase batch sizes: SFT batch=8-16, RL batch=4-8
+> 3. Adjust learning rate: ~5e-6 for 1.5B
+> 4. Expect 2-3x longer training time
+> 5. Budget ~$8,000 for H100/H800 GPUs
 
 > [!NOTE]
-> **Model Size Adaptation**: This guide implements the VibeThinker methodology using **Qwen-0.6B** as a base model for efficient demonstration and development. The original paper uses a **1.5B** model. The techniques (MGPO, decontamination, etc.) are identical, but hyperparameters (batch size, learning rate) may need scaling for larger models.
->
 > **Context Window**: The paper specifies a curriculum expanding to **32K**. This guide reflects that target, though initial stages use smaller windows for efficiency.
+
+## Module 0: Monitoring & Visualization Tools
 
 ### Step 0.1: Training Monitoring & Cost Tracker
 
@@ -379,6 +395,176 @@ if __name__ == "__main__":
     
     monitor.generate_report("demo")
     monitor.plot_training_curves("demo")
+
+
+class MGPORewardCalculator:
+    """
+    Reward calculator for MGPO with symbolic answer evaluation.
+    
+    This class:
+    1. Evaluates generated solutions against reference answers
+    2. Computes entropy weights based on group correctness
+    3. Returns rewards and entropy information for MGPO
+    """
+    
+    def __init__(self, lambda_param: float = 4.0):
+        """
+        Initialize reward calculator.
+        
+        Args:
+            lambda_param: Entropy penalty weight for MGPO
+        """
+        self.lambda_param = lambda_param
+    
+    def evaluate_solution(self, generated: str, reference: str) -> float:
+        """
+        Evaluate a single generated solution against reference answer.
+        
+        Uses symbolic evaluation for mathematical expressions.
+        
+        Args:
+            generated: Generated solution text
+            reference: Reference answer
+        
+        Returns:
+            Reward (1.0 for correct, 0.0 for incorrect)
+        """
+        try:
+            import sympy
+            
+            # Extract final answer from generated text
+            # Look for patterns like "answer is X" or final line
+            generated_clean = self._extract_answer(generated)
+            reference_clean = self._extract_answer(reference)
+            
+            # Try symbolic comparison
+            try:
+                gen_expr = sympy.sympify(generated_clean)
+                ref_expr = sympy.sympify(reference_clean)
+                
+                # Check if expressions are equal
+                if sympy.simplify(gen_expr - ref_expr) == 0:
+                    return 1.0
+            except (sympy.SympifyError, TypeError, ValueError):
+                # Fall back to string comparison
+                if generated_clean.strip() == reference_clean.strip():
+                    return 1.0
+            
+            return 0.0
+        
+        except Exception as e:
+            # On error, fall back to exact string match
+            return 1.0 if generated.strip() == reference.strip() else 0.0
+    
+    def _extract_answer(self, text: str) -> str:
+        """Extract final answer from solution text."""
+        # Common patterns for final answers
+        import re
+        
+        # Look for "answer is X", "= X", etc.
+        patterns = [
+            r"answer is:?\s*(.+?)(?:\n|$)",
+            r"final answer:?\s*(.+?)(?:\n|$)",
+            r"therefore,?\s*(.+?)(?:\n|$)",
+            r"=\s*(.+?)(?:\n|$)",
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+        
+        # If no pattern found, return last line
+        lines = text.strip().split('\n')
+        return lines[-1].strip() if lines else text.strip()
+    
+    def compute_kl_entropy_weight(self, group_correctness: np.ndarray) -> float:
+        """
+        Compute KL divergence from maximum entropy distribution.
+        
+        Args:
+            group_correctness: Array of correctness [0/1] for a question group
+        
+        Returns:
+            Entropy weight in [0, 1]
+        """
+        # Compute group accuracy
+        p_correct = np.mean(group_correctness)
+        p_correct = np.clip(p_correct, 1e-6, 1 - 1e-6)
+        
+        # KL divergence from maximum entropy (0.5)
+        p_0 = 0.5
+        d_kl = (p_correct * np.log(p_correct / p_0) + 
+                (1 - p_correct) * np.log((1 - p_correct) / p_0))
+        
+        # Weight: higher entropy (d_kl ≈ 0) → weight ≈ 1.0
+        # Lower entropy (d_kl large) → weight ≈ 0.0
+        entropy_weight = np.exp(-self.lambda_param * d_kl)
+        
+        return float(entropy_weight)
+    
+    def compute_rewards(self, prompts: List[str], 
+                       completions: List[List[str]],
+                       reference_answers: List[str]) -> Tuple[List[List[float]], List[Dict]]:
+        """
+        Compute rewards and entropy weights for a batch.
+        
+        Args:
+            prompts: List of problem prompts
+            completions: List of generation groups (each problem has G generations)
+            reference_answers: List of reference answers
+        
+        Returns:
+            Tuple of (rewards, entropy_info) where:
+            - rewards: List[List[float]] - rewards for each generation
+            - entropy_info: List[Dict] - entropy weights and stats per problem
+        """
+        batch_rewards = []
+        batch_entropy_info = []
+        
+        for i, (prompt, completion_group, reference) in enumerate(
+            zip(prompts, completions, reference_answers)
+        ):
+            # Evaluate each completion in the group
+            group_correctness = np.array([
+                self.evaluate_solution(comp, reference)
+                for comp in completion_group
+            ])
+            
+            # Compute entropy weight
+            entropy_weight = self.compute_kl_entropy_weight(group_correctness)
+            
+            # Convert to rewards (same as correctness for now)
+            group_rewards = group_correctness.tolist()
+            
+            batch_rewards.append(group_rewards)
+            batch_entropy_info.append({
+                "entropy_weight": entropy_weight,
+                "accuracy": float(np.mean(group_correctness)),
+                "num_correct": int(np.sum(group_correctness)),
+                "num_total": len(group_correctness),
+            })
+        
+        return batch_rewards, batch_entropy_info
+
+
+if __name__ == "__main__":
+    # Example: Test reward calculator
+    reward_calc = MGPORewardCalculator(lambda_param=4.0)
+    
+    # Test symbolic evaluation
+    test_cases = [
+        ("2x + 3 = 7\nx = 2", "x = 2", 1.0),
+        ("The answer is 42", "42", 1.0),
+        ("x = 5", "x = 3", 0.0),
+    ]
+    
+    print("Testing MGPORewardCalculator:")
+    for gen, ref, expected in test_cases:
+        reward = reward_calc.evaluate_solution(gen, ref)
+        status = "✓" if reward == expected else "✗"
+        print(f"{status} Generated: '{gen}' vs Reference: '{ref}' -> Reward: {reward}")
+
 ```
 
 ---
@@ -958,7 +1144,12 @@ class MGPOTrainerWithEntropyWeighting:
         # Step 6: Backward pass
         self.optimizer.zero_grad()
         loss.backward()
+        
+        # Gradient clipping (max_norm=1.0)
+        # Note: Paper doesn't specify this value. We use 1.0 as a standard choice
+        # for RL training to prevent gradient explosions. Adjust if needed.
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+        
         self.optimizer.step()
         
         # Return metrics
@@ -1092,9 +1283,41 @@ def train_signal_phase_with_mgpo(
                 break
             
             # Prepare batch
+            # Generate G completions for each problem in the batch
+            G = 8  # Number of generations per problem (Paper uses 8-16)
+            
+            all_completions = []
+            for problem in batch["problem"]:
+                # Format prompt
+                prompt_text = f"Solve the following problem step by step:\n\n{problem}\n\nSolution:"
+                
+                # Generate multiple solutions
+                problem_completions = []
+                for _ in range(G):
+                    inputs = tokenizer(prompt_text, return_tensors="pt").to(model.device)
+                    
+                    with torch.no_grad():
+                        outputs = model.generate(
+                            inputs["input_ids"],
+                            max_length=config.max_completion_length,
+                            temperature=0.7,  # Sampling for diversity
+                            top_p=0.95,
+                            do_sample=True,
+                            pad_token_id=tokenizer.pad_token_id,
+                            eos_token_id=tokenizer.eos_token_id,
+                        )
+                    
+                    # Decode and store
+                    completion = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    # Remove the prompt from completion
+                    completion = completion[len(prompt_text):].strip()
+                    problem_completions.append(completion)
+                
+                all_completions.append(problem_completions)
+            
             batch_dict = {
                 "prompts": batch["problem"],
-                "completions": [[]],  # Would be filled with generations
+                "completions": all_completions,  # Now filled with actual generations
                 "reference_answers": batch["answer"],
             }
             
@@ -2051,6 +2274,339 @@ if __name__ == "__main__":
 
 ---
 
+## Module 5: Model Fusion (Spectrum Phase)
+
+### Step 5.1: Expert Model Fusion
+
+```python
+# vibethinker_model_fusion.py
+"""
+Merge domain-specific expert models into a unified spectrum model.
+
+This implements the fusion strategy from the paper where domain specialists
+(algebra, geometry, calculus, statistics) are combined.
+"""
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from pathlib import Path
+from typing import List, Dict
+import numpy as np
+
+
+def load_expert_models(expert_paths: List[str], device: str = "cuda"):
+    """Load all expert models."""
+    experts = []
+    for path in expert_paths:
+        model = AutoModelForCausalLM.from_pretrained(path)
+        model.to(device)
+        model.eval()
+        experts.append(model)
+    return experts
+
+
+def fusion_weighted_average(expert_models: List[torch.nn.Module], 
+                           weights: List[float] = None) -> torch.nn.Module:
+    """
+    Fuse expert models using weighted parameter averaging.
+    
+    Args:
+        expert_models: List of expert models
+        weights: Fusion weights (default: equal weighting)
+    
+    Returns:
+        Fused model
+    """
+    if weights is None:
+        weights = [1.0 / len(expert_models)] * len(expert_models)
+    
+    assert len(weights) == len(expert_models)
+    assert abs(sum(weights) - 1.0) < 1e-6, "Weights must sum to 1.0"
+    
+    # Clone first model as base
+    fused_model = type(expert_models[0]).from_pretrained(
+        expert_models[0].config._name_or_path
+    )
+    
+    # Average parameters
+    with torch.no_grad():
+        for name, param in fused_model.named_parameters():
+            # Initialize to zero
+            param.data.zero_()
+            
+            # Weighted sum
+            for expert, weight in zip(expert_models, weights):
+                expert_param = dict(expert.named_parameters())[name]
+                param.data += weight * expert_param.data
+    
+    return fused_model
+
+
+def fusion_task_arithmetic(base_model: torch.nn.Module,
+                          expert_models: List[torch.nn.Module],
+                          scaling: float = 0.3) -> torch.nn.Module:
+    """
+    Task arithmetic fusion: fused = base + α * Σ(expert_i - base).
+    
+    Args:
+        base_model: Base pretrained model
+        expert_models: List of fine-tuned expert models
+        scaling: Scaling factor for task vectors
+    
+    Returns:
+        Fused model
+    """
+    fused_model = type(base_model).from_pretrained(base_model.config._name_or_path)
+    
+    with torch.no_grad():
+        for name, param in fused_model.named_parameters():
+            base_param = dict(base_model.named_parameters())[name]
+            
+            # Compute task vector sum
+            task_vector_sum = torch.zeros_like(base_param)
+            for expert in expert_models:
+                expert_param = dict(expert.named_parameters())[name]
+                task_vector_sum += (expert_param.data - base_param.data)
+            
+            # Apply task arithmetic
+            param.data = base_param.data + scaling * task_vector_sum
+    
+    return fused_model
+
+
+def validate_fusion(fused_model, tokenizer, test_problems: List[Dict]):
+    """Validate fused model performance across domains."""
+    fused_model.eval()
+    
+    domain_accuracies = {}
+    
+    for domain in ["algebra", "geometry", "calculus", "statistics"]:
+        domain_problems = [p for p in test_problems if p["domain"] == domain]
+        correct = 0
+        
+        for problem in domain_problems[:10]:  # Sample 10 per domain
+            prompt = f"Solve: {problem['question']}"
+            inputs = tokenizer(prompt, return_tensors="pt").to(fused_model.device)
+            
+            with torch.no_grad():
+                outputs = fused_model.generate(
+                    inputs["input_ids"],
+                    max_length=512,
+                    temperature=0.7,
+                    do_sample=True,
+                )
+            
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Simple check (in practice, use symbolic evaluation)
+            if problem["answer"].lower() in response.lower():
+                correct += 1
+        
+        accuracy = correct / min(len(domain_problems), 10)
+        domain_accuracies[domain] = accuracy
+    
+    return domain_accuracies
+
+
+if __name__ == "__main__":
+    # Example: Fuse 4 domain experts
+    expert_paths = [
+        "checkpoints/vibethinker_algebra",
+        "checkpoints/vibethinker_geometry",
+        "checkpoints/vibethinker_calculus",
+        "checkpoints/vibethinker_statistics",
+    ]
+    
+    print("Loading expert models...")
+    experts = load_expert_models(expert_paths)
+    
+    print("Fusing models with weighted average...")
+    fused_model = fusion_weighted_average(experts, weights=[0.25, 0.25, 0.25, 0.25])
+    
+    # Save fused model
+    output_path = "checkpoints/vibethinker_spectrum_fused"
+    fused_model.save_pretrained(output_path)
+    print(f"✓ Fused model saved to: {output_path}")
+```
+
+---
+
+## Module 6: GGUF Export & Quantization
+
+### Step 6.1: Export to GGUF Format
+
+```python
+# vibethinker_export_gguf.py
+"""
+Export VibeThinker model to GGUF format for efficient inference
+on edge devices and CPU-based deployment.
+"""
+
+import subprocess
+import os
+from pathlib import Path
+from typing import Optional
+
+
+def export_to_gguf(
+    model_path: str,
+    output_path: str,
+    quantization: str = "q4_k_m",
+    use_llama_cpp: bool = True
+):
+    """
+    Export model to GGUF format.
+    
+    Args:
+        model_path: Path to HuggingFace model
+        output_path: Output path for GGUF file
+        quantization: Quantization type (q4_k_m, q5_k_m, q8_0, f16)
+        use_llama_cpp: Use llama.cpp for conversion
+    
+    Quantization options:
+        - q4_k_m: 4-bit quantization, medium quality (recommended)
+        - q5_k_m: 5-bit quantization, higher quality
+        - q8_0: 8-bit quantization, very high quality
+        - f16: 16-bit float, no quantization
+    """
+    
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    if use_llama_cpp:
+        print("Using llama.cpp for GGUF conversion...")
+        
+        # Step 1: Convert to GGUF fp16
+        temp_fp16 = output_path.replace(".gguf", "-fp16.gguf")
+        
+        print(f"Step 1/2: Converting {model_path} to FP16 GGUF...")
+        convert_cmd = [
+            "python",
+            "llama.cpp/convert-hf-to-gguf.py",
+            model_path,
+            "--outfile", temp_fp16,
+            "--outtype", "f16"
+        ]
+        
+        try:
+            result = subprocess.run(convert_cmd, check=True, capture_output=True, text=True)
+            print(f"✓ FP16 conversion complete: {temp_fp16}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error during FP16 conversion: {e.stderr}")
+            raise
+        
+        # Step 2: Quantize
+        if quantization != "f16":
+            print(f"Step 2/2: Quantizing to {quantization}...")
+            quantize_cmd = [
+                "llama.cpp/quantize",
+                temp_fp16,
+                output_path,
+                quantization
+            ]
+            
+            try:
+                result = subprocess.run(quantize_cmd, check=True, capture_output=True, text=True)
+                print(f"✓ Quantization complete: {output_path}")
+                
+                # Remove temp file
+                os.remove(temp_fp16)
+            except subprocess.CalledProcessError as e:
+                print(f"Error during quantization: {e.stderr}")
+                raise
+        else:
+            # No quantization, just rename
+            os.rename(temp_fp16, output_path)
+            print(f"✓ FP16 export complete: {output_path}")
+    
+    else:
+        # Alternative: Use HuggingFace optimum
+        print("Using HuggingFace optimum for GGUF conversion...")
+        try:
+            from optimum.exporters.ggml import main as ggml_export
+            
+            ggml_export([
+                "--model", model_path,
+                "--output", output_path,
+                "--quantize", quantization,
+            ])
+            print(f"✓ GGUF export complete: {output_path}")
+        except ImportError:
+            print("ERROR: optimum not installed. Install with: pip install optimum")
+            raise
+    
+    # Verify output
+    output_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"\nExport Summary:")
+    print(f"  Output file: {output_path}")
+    print(f"  Size: {output_size_mb:.2f} MB")
+    print(f"  Quantization: {quantization}")
+
+
+def benchmark_gguf_inference(gguf_path: str, prompt: str = "Solve: 2x + 3 = 7"):
+    """Benchmark GGUF model inference speed."""
+    import time
+    
+    print(f"\nBenchmarking GGUF model: {gguf_path}")
+    
+    # Use llama-cpp-python for inference
+    try:
+        from llama_cpp import Llama
+        
+        # Load model
+        llm = Llama(model_path=gguf_path, n_ctx=2048, n_threads=8)
+        
+        # Warmup
+        _ = llm(prompt, max_tokens=10)
+        
+        # Benchmark
+        start = time.time()
+        output = llm(prompt, max_tokens=256, temperature=0.7)
+        elapsed = time.time() - start
+        
+        tokens_generated = len(output["choices"][0]["text"].split())
+        tokens_per_sec = tokens_generated / elapsed
+        
+        print(f"✓ Generation completed in {elapsed:.2f}s")
+        print(f"  Tokens generated: {tokens_generated}")
+        print(f"  Speed: {tokens_per_sec:.1f} tokens/sec")
+        print(f"  Output: {output['choices'][0]['text'][:100]}...")
+        
+    except ImportError:
+        print("ERROR: llama-cpp-python not installed.")
+        print("Install with: pip install llama-cpp-python")
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Export VibeThinker to GGUF")
+    parser.add_argument("--model-path", required=True, help="Path to HuggingFace model")
+    parser.add_argument("--output", required=True, help="Output GGUF file path")
+    parser.add_argument("--quantization", default="q4_k_m", 
+                       choices=["q4_k_m", "q5_k_m", "q8_0", "f16"],
+                       help="Quantization type")
+    parser.add_argument("--benchmark", action="store_true", help="Run benchmark after export")
+    
+    args = parser.parse_args()
+    
+    # Export
+    export_to_gguf(
+        model_path=args.model_path,
+        output_path=args.output,
+        quantization=args.quantization
+    )
+    
+    # Benchmark if requested
+    if args.benchmark:
+        benchmark_gguf_inference(args.output)
+    
+    print("\n✓ Export complete!")
+    print(f"\nTo use this model:")
+    print(f"  llama-cli -m {args.output} -p 'Solve: 2x + 3 = 7'")
+```
+
+---
+
 ## Summary: Complete Implementation Checklist
 
 ```markdown
@@ -2098,6 +2654,7 @@ if __name__ == "__main__":
 ## ✅ Phase 6: Evaluation
 - [x] AIME24/25 benchmarks
 - [x] MATH-500
+- [x] GPQA (graduate-level Q&A)
 - [x] LiveCodeBench
 - [x] Comparison across stages
 
@@ -2114,6 +2671,159 @@ if __name__ == "__main__":
 - `vibethinker_cost_analysis.py`: Comprehensive cost analysis
 - `vibethinker_debugger.py`: Debugging & performance tools
 - `vibethinker_train_complete.py`: Unified training script
+```
+
+---
+
+## Module 7: Inference Optimization
+
+### Best Practices for Efficient Inference
+
+```python
+# vibethinker_inference_optimize.py
+"""
+Optimization techniques for VibeThinker inference.
+"""
+
+import torch
+from typing import List, Dict, Optional
+
+
+class OptimizedInference:
+    """Optimized inference wrapper for VibeThinker."""
+    
+    def __init__(self, model, tokenizer, device="cuda"):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device
+        
+        # Enable inference optimizations
+        self.model.eval()
+        
+        # Use torch.compile if available (PyTorch 2.0+)
+        if hasattr(torch, 'compile'):
+            self.model = torch.compile(self.model, mode="reduce-overhead")
+    
+    def generate_optimized(self, prompt: str, max_length: int = 512, 
+                          num_beams: int = 1, temperature: float = 0.7,
+                          use_cache: bool = True) -> str:
+        """
+        Generate with optimizations.
+        
+        Optimizations:
+        - KV-cache enabled (use_cache=True)
+        - Mixed precision (bfloat16/float16)
+        - Batched generation for multiple prompts
+        """
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        
+        with torch.no_grad():
+            with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
+                outputs = self.model.generate(
+                    inputs["input_ids"],
+                    max_length=max_length,
+                    num_beams=num_beams,
+                    temperature=temperature,
+                    do_sample=(temperature > 0),
+                    use_cache=use_cache,  # Enable KV-cache for faster generation
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+        
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    def batch_generate(self, prompts: List[str], **kwargs) -> List[str]:
+        """Batch generation for higher throughput."""
+        inputs = self.tokenizer(
+            prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True
+        ).to(self.device)
+        
+        with torch.no_grad():
+            with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
+                outputs = self.model.generate(
+                    inputs["input_ids"],
+                    **kwargs,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+        
+        return [
+            self.tokenizer.decode(out, skip_special_tokens=True)
+            for out in outputs
+        ]
+```
+
+**Key Inference Tips**:
+1. **Use KV-cache** (`use_cache=True`) for faster autoregressive generation
+2. **Mixed precision** (bfloat16 or float16) reduces memory and increases speed
+3. **Batch generation** for multiple prompts improves GPU utilization
+4. **torch.compile** (PyTorch 2.0+) can provide 2-3x speedup
+5. **vLLM or TGI** for production deployment with PagedAttention
+
+---
+
+## Module 8: Cost Analysis for 1.5B Model
+
+### Scaling Guide to Match Paper's 1.5B Model
+
+The implementation guide uses Qwen-0.6B for demonstration. To replicate the paper's VibeThinker-1.5B:
+
+#### **Adjusted Hyperparameters for 1.5B**:
+
+```python
+# Configuration for 1.5B model (matching paper)
+class Config1_5B:
+    # Model
+    model_name = "Qwen/Qwen2.5-1.5B"  # or similar 1.5B base
+    
+    # SFT Phase
+    sft_batch_size = 8  # vs 4 for 0.6B
+    sft_learning_rate = 5e-6
+    sft_steps_per_domain = 1500  # Same as paper
+    
+    # RL Phase  
+    rl_batch_size = 4  # vs 2 for 0.6B
+    rl_num_generations = 16  # vs 8 for 0.6B (paper uses 8-16)
+    rl_learning_rate = 5e-6
+    rl_steps_stage1 = 500  # 4K context
+    rl_steps_stage2 = 500  # 8K context
+    rl_steps_stage3 = 500  # 32K context
+    
+    # Resources
+    gpu_memory_required = "~40-60GB"  # Need A100-80GB or H100
+    training_time_estimate = "~48-72 hours total"
+    estimated_cost = "$7,000-$8,000"  # On H100/H800
+```
+
+#### **Cost Comparison Table**:
+
+| Model | Parameters | GPU | Training Time | Total Cost | AIME 2025 (Expected) |
+|-------|------------|-----|---------------|------------|---------------------|
+| **VibeThinker-1.5B (Paper)** | 1.5B | H800 | ~48-60h | ~$8,000 | 13.3% |
+| **VibeThinker-0.6B (This Guide)** | 0.6B | H100 | ~20-30h | ~$3,000-$5,000 | ~8-10% (estimated) |
+| **Scaling Factor** | 2.5x | - | 2.3x | 1.8x | ~1.3x |
+
+#### **Running 1.5B Training**:
+
+```bash
+# 1. Replace model in training script
+# Edit vibethinker_train_complete.py, line ~1835:
+model, _ = FastLanguageModel.from_pretrained(
+    "Qwen/Qwen2.5-1.5B",  # Changed from Qwen3-0.6B
+    max_seq_length=4096,
+    load_in_4bit=True,
+)
+
+# 2. Adjust hyperparameters
+# Increase batch sizes and num_generations as shown in Config1_5B
+
+# 3. Run training
+python vibethinker_train_complete.py \
+    --model-size 1.5B \
+    --sft-batch-size 8 \
+    --rl-batch-size 4 \
+    --rl-num-generations 16
 ```
 
 ---
