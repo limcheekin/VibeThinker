@@ -50,7 +50,9 @@ def train_signal_phase_complete(
     print("Initializing monitors and debuggers...")
     monitor = TrainingMonitor(output_dir=f"{output_dir}/monitoring")
     debugger = TrainingDebugger(log_dir=f"{output_dir}/debug_logs")
-    analyzer = GenerationAnalyzer(model, tokenizer, output_dir=f"{output_dir}/generation_viz")
+    analyzer = GenerationAnalyzer(
+        model, tokenizer, output_dir=f"{output_dir}/generation_viz"
+    )
     attention_viz = AttentionVisualizer(
         model, tokenizer, output_dir=f"{output_dir}/attention"
     )
@@ -187,7 +189,9 @@ if __name__ == "__main__":
     train_dataset = load_dataset(
         "json", data_files="data/algebra_train.jsonl", split="train"
     )
-    val_dataset = load_dataset("json", data_files="data/algebra_val.jsonl", split="train")
+    val_dataset = load_dataset(
+        "json", data_files="data/algebra_val.jsonl", split="train"
+    )
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
     train_signal_phase_complete(
         spectrum_model_path="checkpoints/vibethinker_spectrum",

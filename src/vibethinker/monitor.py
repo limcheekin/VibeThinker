@@ -1,4 +1,3 @@
-
 import time
 import subprocess
 from typing import Dict, List, Optional, Tuple, Any
@@ -79,7 +78,9 @@ class GPUMonitor:
                 gpu_utilization_pct=0,
             )
         try:
-            query = "utilization.gpu,memory.used,memory.total,power.draw,temperature.gpu"
+            query = (
+                "utilization.gpu,memory.used,memory.total,power.draw,temperature.gpu"
+            )
             result = subprocess.run(
                 [
                     "nvidia-smi",
@@ -328,6 +329,7 @@ class MGPORewardCalculator:
         """
         try:
             import sympy
+
             generated_clean = self._extract_answer(generated)
             reference_clean = self._extract_answer(reference)
             try:
@@ -345,6 +347,7 @@ class MGPORewardCalculator:
     def _extract_answer(self, text: str) -> str:
         """Extract final answer from solution text."""
         import re
+
         patterns = [
             r"answer is:?\s*(.+?)(?:\n|$)",
             r"final answer:?\s*(.+?)(?:\n|$)",

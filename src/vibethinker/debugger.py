@@ -161,6 +161,7 @@ class PerformanceInspector:
     ) -> Dict[str, Any]:
         """Benchmark training throughput."""
         import time
+
         model.train()
         dummy_input = torch.randint(0, 50000, (4, 512)).cuda()
         for _ in range(3):

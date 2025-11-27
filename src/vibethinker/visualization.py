@@ -1,4 +1,3 @@
-
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -10,7 +9,9 @@ from pathlib import Path
 class AttentionVisualizer:
     """Visualize attention patterns in transformer models."""
 
-    def __init__(self, model: Any, tokenizer: Any, output_dir: str = "attention_viz") -> None:
+    def __init__(
+        self, model: Any, tokenizer: Any, output_dir: str = "attention_viz"
+    ) -> None:
         self.model = model
         self.tokenizer = tokenizer
         self.output_dir = Path(output_dir)
@@ -92,7 +93,9 @@ class AttentionVisualizer:
 class GenerationAnalyzer:
     """Analyze model generation patterns and diversity."""
 
-    def __init__(self, model: Any, tokenizer: Any, output_dir: str = "generation_viz") -> None:
+    def __init__(
+        self, model: Any, tokenizer: Any, output_dir: str = "generation_viz"
+    ) -> None:
         self.model = model
         self.tokenizer = tokenizer
         self.output_dir = Path(output_dir)
@@ -212,7 +215,9 @@ class LossLandscapeVisualizer:
             count = 0
             with torch.no_grad():
                 for sample in dataset.take(5):
-                    inputs = tokenizer(sample["problem"], return_tensors="pt").to(device)
+                    inputs = tokenizer(sample["problem"], return_tensors="pt").to(
+                        device
+                    )
                     outputs = model(**inputs, labels=inputs["input_ids"])
                     batch_loss += outputs.loss.item()
                     count += 1

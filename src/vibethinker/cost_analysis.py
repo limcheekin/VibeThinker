@@ -1,4 +1,3 @@
-
 """
 Complete cost analysis and resource profiling for VibeThinker training.
 """
@@ -76,9 +75,8 @@ class CostAnalyzer:
         """
         utilization = 0.5
         overhead_factor = 2.0
-        tokens_per_sec: float = (
-            (self.gpu_spec["flops_fp32"] * utilization)
-            / (model_params * overhead_factor)
+        tokens_per_sec: float = (self.gpu_spec["flops_fp32"] * utilization) / (
+            model_params * overhead_factor
         )
         batch_scaling = min(batch_size / 16, 2.0)
         tokens_per_sec *= batch_scaling
@@ -132,13 +130,41 @@ class CostAnalyzer:
         Generate cost estimate for entire VibeThinker pipeline.
         """
         stages: Dict[str, Dict[str, Any]] = {
-            "spectrum_algebra": {"steps": 1500, "batch_size": 4, "description": "SFT - Algebra specialist"},
-            "spectrum_geometry": {"steps": 1500, "batch_size": 4, "description": "SFT - Geometry specialist"},
-            "spectrum_calculus": {"steps": 1500, "batch_size": 4, "description": "SFT - Calculus specialist"},
-            "spectrum_statistics": {"steps": 1500, "batch_size": 4, "description": "SFT - Statistics specialist"},
-            "signal_stage1": {"steps": 500, "batch_size": 2, "description": "RL - 4K context window"},
-            "signal_stage2": {"steps": 500, "batch_size": 2, "description": "RL - 8K context window"},
-            "signal_stage3": {"steps": 500, "batch_size": 2, "description": "RL - 32K context window"},
+            "spectrum_algebra": {
+                "steps": 1500,
+                "batch_size": 4,
+                "description": "SFT - Algebra specialist",
+            },
+            "spectrum_geometry": {
+                "steps": 1500,
+                "batch_size": 4,
+                "description": "SFT - Geometry specialist",
+            },
+            "spectrum_calculus": {
+                "steps": 1500,
+                "batch_size": 4,
+                "description": "SFT - Calculus specialist",
+            },
+            "spectrum_statistics": {
+                "steps": 1500,
+                "batch_size": 4,
+                "description": "SFT - Statistics specialist",
+            },
+            "signal_stage1": {
+                "steps": 500,
+                "batch_size": 2,
+                "description": "RL - 4K context window",
+            },
+            "signal_stage2": {
+                "steps": 500,
+                "batch_size": 2,
+                "description": "RL - 8K context window",
+            },
+            "signal_stage3": {
+                "steps": 500,
+                "batch_size": 2,
+                "description": "RL - 32K context window",
+            },
         }
         total_cost = 0.0
         stage_profiles: List[TrainingStageProfile] = []
@@ -172,7 +198,8 @@ class CostAnalyzer:
             "stages": stage_profiles,
             "total_estimated_cost": total_cost,
             "total_estimated_hours": sum(s.estimated_gpu_hours for s in stage_profiles),
-            "total_estimated_days": sum(s.estimated_gpu_hours for s in stage_profiles) / 24,
+            "total_estimated_days": sum(s.estimated_gpu_hours for s in stage_profiles)
+            / 24,
         }
 
     def print_cost_report(self) -> None:
@@ -225,6 +252,7 @@ class CostAnalyzer:
         print(f"Cost reduction: {(1 - our_cost / original_cost_1_5b) * 100:.1f}%")
         print("=" * 80 + "\n")
 
+
 def compare_gpu_options() -> None:
     """Compare costs across different GPU types."""
     print("\n" + "=" * 100)
@@ -248,6 +276,7 @@ def compare_gpu_options() -> None:
             f"${cost_est['cost_per_step']:>14.4f}"
         )
     print("=" * 100 + "\n")
+
 
 if __name__ == "__main__":
     analyzer = CostAnalyzer(gpu_type="H100", region="us-west")

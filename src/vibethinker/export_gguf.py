@@ -47,9 +47,7 @@ def export_to_gguf(
             print(f"Step 2/2: Quantizing to {quantization}...")
             quantize_cmd = ["llama.cpp/quantize", temp_fp16, output_path, quantization]
             try:
-                subprocess.run(
-                    quantize_cmd, check=True, capture_output=True, text=True
-                )
+                subprocess.run(quantize_cmd, check=True, capture_output=True, text=True)
                 print(f"✓ Quantization complete: {output_path}")
                 os.remove(temp_fp16)
             except subprocess.CalledProcessError as e:
@@ -84,11 +82,10 @@ def export_to_gguf(
     print(f"  Quantization: {quantization}")
 
 
-def benchmark_gguf_inference(
-    gguf_path: str, prompt: str = "Solve: 2x + 3 = 7"
-) -> None:
+def benchmark_gguf_inference(gguf_path: str, prompt: str = "Solve: 2x + 3 = 7") -> None:
     """Benchmark GGUF model inference speed."""
     import time
+
     print(f"\nBenchmarking GGUF model: {gguf_path}")
     try:
         from llama_cpp import Llama

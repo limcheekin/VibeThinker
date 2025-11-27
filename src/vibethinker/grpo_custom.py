@@ -173,7 +173,9 @@ class MGPOTrainerWithEntropyWeighting:
                     truncation=True,
                     max_length=self.config.max_completion_length,
                 )
-                outputs = self.model(**{k: v.to(self.device) for k, v in tokens.items()})
+                outputs = self.model(
+                    **{k: v.to(self.device) for k, v in tokens.items()}
+                )
                 log_p = self.compute_log_probabilities(
                     outputs, tokens["input_ids"].to(self.device)
                 )
