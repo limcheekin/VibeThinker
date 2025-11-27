@@ -1,43 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "vibethinker"
 version = "0.1.0"
-description = "An implementation of the VibeThinker model."
-authors = [{ name = "Jules", email = "jules@example.com" }]
 requires-python = ">=3.11"
 dependencies = [
     "torch",
-    "matplotlib",
-    "numpy",
-    "psutil",
-    "seaborn",
     "transformers",
-    "datasets",
     "unsloth",
-    "llama-cpp-python",
-    "optimum",
-    "sympy"
+    "matplotlib",
+    "psutil",
+    "numpy",
+    "seaborn",
+    "sympy",
+    "datasets",
+    "accelerate",
+    "bitsandbytes",
+    "scipy",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-cov",
-    "pytest-mock",
     "black",
     "isort",
     "mypy",
-    "flake8"
+    "flake8",
 ]
 
-[tool.setuptools]
-packages = ["vibethinker"]
-package-dir = { "" = "src" }
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.black]
 line-length = 88
 
 [tool.isort]
 profile = "black"
+line_length = 88
+
+[tool.flake8]
+max-line-length = 88
 
 [tool.mypy]
 strict = true
