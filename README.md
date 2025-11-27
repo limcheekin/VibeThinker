@@ -1,6 +1,6 @@
 # VibeThinker
 
-This repository contains a Python implementation of the VibeThinker model, based on the provided implementation guide.
+This repository contains the implementation of the VibeThinker project, a production-quality Python project based on the specifications in `docs/implementation_guide.md`.
 
 ## Development Setup
 
@@ -10,32 +10,45 @@ This repository contains a Python implementation of the VibeThinker model, based
     cd <repository-name>
     ```
 
-2.  **Create a virtual environment:**
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    ```
-
-3.  **Install dependencies:**
+2.  **Install dependencies:**
+    This project uses `pyproject.toml` to manage dependencies. Install the project in editable mode with the development dependencies:
     ```bash
     pip install -e .[dev]
     ```
 
-## Running Linters
-
-To check for code formatting and style, run the following commands:
-
-```bash
-black --check .
-isort --check .
-flake8 src tests
-mypy src
-```
-
 ## Running Tests
 
-To run the unit tests and see a coverage report, use the following command:
+This project uses `pytest` for testing. To run the tests and see a coverage report:
 
 ```bash
 pytest --cov=src/vibethinker --cov-report=term-missing
+```
+
+## Running Linters
+
+This project uses `black`, `isort`, and `flake8` for linting and code formatting.
+
+-   **Check formatting:**
+    ```bash
+    black --check .
+    isort --check .
+    ```
+
+-   **Apply formatting:**
+    ```bash
+    black .
+    isort .
+    ```
+
+-   **Run flake8:**
+    ```bash
+    flake8 src
+    ```
+
+## Running the Project
+
+The main entry point for the project is `src/vibethinker/train_complete.py`. To run the full training pipeline:
+
+```bash
+python src/vibethinker/train_complete.py
 ```

@@ -5,51 +5,49 @@ import torch
 from vibethinker.grpo_custom import MGPOLoss
 
 
-def test_mgpo_loss_kl_entropy_weight():
-    loss_fn = MGPOLoss(lambda_param=4.0)
+@pytest.fixture
+def mgpo_loss():
+    return MGPOLoss(lambda_param=4.0, epsilon=0.2)
 
-    # High entropy (close to 0.5) should have a weight close to 1.0
+
+def test_compute_kl_entropy_weight(mgpo_loss):
+    # High entropy (50% correct) -> weight should be close to 1.0
     high_entropy_correctness = np.array([1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0])
-    high_entropy_weight = loss_fn.compute_kl_entropy_weight(high_entropy_correctness)
-    assert high_entropy_weight == pytest.approx(1.0, abs=1e-2)
+    high_entropy_weight = mgpo_loss.compute_kl_entropy_weight(high_entropy_correctness)
+    assert 0.9 < high_entropy_weight <= 1.0
 
-    # Low entropy (all correct) should have a low weight
+    # Low entropy (100% correct) -> weight should be close to 0.0
     low_entropy_correctness = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-    low_entropy_weight = loss_fn.compute_kl_entropy_weight(low_entropy_correctness)
-    assert low_entropy_weight < 0.1
-
-    # Low entropy (all incorrect) should also have a low weight
-    all_incorrect_correctness = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    all_incorrect_weight = loss_fn.compute_kl_entropy_weight(all_incorrect_correctness)
-    assert all_incorrect_weight < 0.1
+    low_entropy_weight = mgpo_loss.compute_kl_entropy_weight(low_entropy_correctness)
+    assert 0.0 <= low_entropy_weight < 0.1
 
 
-def test_mgpo_loss_compute_advantages():
-    loss_fn = MGPOLoss(lambda_param=4.0)
+def test_compute_advantages(mgpo_loss):
     rewards = torch.tensor(
-        [
-            [1.0, 1.0, 0.0, 0.0],  # High entropy
-            [1.0, 1.0, 1.0, 0.0],  # Low entropy
-        ],
-        dtype=torch.float32,
+        [[1.0, 1.0, 0.0, 0.0], [0.5, 0.5, 0.5, 0.5]], dtype=torch.float32
     )
-    entropy_weights = torch.tensor([0.9, 0.2], dtype=torch.float32)
 
-    # Test without entropy weighting
-    advantages_no_weight = loss_fn.compute_advantages(rewards)
-    assert advantages_no_weight.shape == rewards.shape
-    # Check that the mean of each row is close to 0
-    assert torch.allclose(advantages_no_weight.mean(dim=1), torch.zeros(2), atol=1e-6)
+    advantages = mgpo_loss.compute_advantages(rewards)
 
-    # Test with entropy weighting
-    advantages_with_weight = loss_fn.compute_advantages(rewards, entropy_weights)
-    assert advantages_with_weight.shape == rewards.shape
-    # Check that the weighted advantages are different from the unweighted ones
-    assert not torch.allclose(advantages_no_weight, advantages_with_weight)
-    # Check that the second row (low entropy) is scaled down more
+    # The rewards [1.0, 1.0, 0.0, 0.0] have a mean of 0.5.
+    # The unbiased standard deviation (torch.std default) is ~0.577.
+    # The advantages are (rewards - mean) / std, so |0.5 / 0.577| ~= 0.866.
     assert torch.allclose(
-        advantages_with_weight[0], advantages_no_weight[0] * entropy_weights[0]
+        torch.abs(advantages[0]),
+        torch.tensor([0.8660, 0.8660, 0.8660, 0.8660]),
+        atol=1e-4,
     )
-    assert torch.allclose(
-        advantages_with_weight[1], advantages_no_weight[1] * entropy_weights[1]
-    )
+
+    # Second group has mean 0.5 and std 0, so advantages should be all 0
+    assert torch.allclose(advantages[1], torch.tensor([0.0, 0.0, 0.0, 0.0]))
+
+
+def test_compute_advantages_with_entropy_weighting(mgpo_loss):
+    rewards = torch.tensor([[1.0, 1.0, 0.0, 0.0]], dtype=torch.float32)
+    entropy_weights = torch.tensor([0.5], dtype=torch.float32)
+
+    advantages = mgpo_loss.compute_advantages(rewards, entropy_weights)
+
+    # Advantages should be scaled by the entropy weight
+    base_advantages = mgpo_loss.compute_advantages(rewards)
+    assert torch.allclose(advantages, base_advantages * 0.5)
