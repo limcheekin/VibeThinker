@@ -5,9 +5,10 @@ This implements the fusion strategy from the paper where domain specialists
 (algebra, geometry, calculus, statistics) are combined.
 """
 
+from typing import Any, Dict, List, Optional
+
 import torch
 from transformers import AutoModelForCausalLM
-from typing import List, Dict, Any, Optional
 
 
 def load_expert_models(expert_paths: List[str], device: str = "cuda") -> List[Any]:

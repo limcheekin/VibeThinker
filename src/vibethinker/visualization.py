@@ -1,9 +1,10 @@
-import torch
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-from typing import Dict, Any, List
 from pathlib import Path
+from typing import Any, Dict, List
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import torch
 
 
 class AttentionVisualizer:

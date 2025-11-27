@@ -3,12 +3,14 @@ Integration of MGPO trainer into the main training loop.
 """
 
 import os
+from typing import Any, Dict, List
+
 import torch
 from torch.utils.data import DataLoader
+
 from vibethinker.grpo_custom import MGPOTrainerWithEntropyWeighting
 from vibethinker.monitor import MGPORewardCalculator, TrainingMonitor
 from vibethinker.visualization import GenerationAnalyzer
-from typing import Any, Dict, List
 
 
 def train_signal_phase_with_mgpo(

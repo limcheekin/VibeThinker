@@ -2,8 +2,9 @@
 Optimization techniques for VibeThinker inference.
 """
 
+from typing import Any, List
+
 import torch
-from typing import List, Any
 
 
 class OptimizedInference:

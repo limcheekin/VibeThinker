@@ -2,9 +2,9 @@
 Complete cost analysis and resource profiling for VibeThinker training.
 """
 
-from dataclasses import dataclass
-from typing import Dict, List, Any
 import json
+from dataclasses import dataclass
+from typing import Any, Dict, List
 
 
 @dataclass

@@ -3,8 +3,8 @@ Export VibeThinker model to GGUF format for efficient inference
 on edge devices and CPU-based deployment.
 """
 
-import subprocess
 import os
+import subprocess
 from typing import Any
 
 

@@ -5,11 +5,12 @@ This properly modifies the advantage calculation to incorporate entropy weightin
 rather than attempting to modify rewards (which gets normalized away).
 """
 
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 import torch
 import torch.nn.functional as F
-from typing import Optional, Dict, Any, List
-import numpy as np
-from dataclasses import dataclass
 
 
 @dataclass
