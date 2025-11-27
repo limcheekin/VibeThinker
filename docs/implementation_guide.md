@@ -5,6 +5,11 @@
 
 ## Module 0: Monitoring & Visualization Tools
 
+> [!NOTE]
+> **Model Size Adaptation**: This guide implements the VibeThinker methodology using **Qwen-0.6B** as a base model for efficient demonstration and development. The original paper uses a **1.5B** model. The techniques (MGPO, decontamination, etc.) are identical, but hyperparameters (batch size, learning rate) may need scaling for larger models.
+>
+> **Context Window**: The paper specifies a curriculum expanding to **32K**. This guide reflects that target, though initial stages use smaller windows for efficiency.
+
 ### Step 0.1: Training Monitoring & Cost Tracker
 
 ```python
@@ -714,6 +719,13 @@ class MGPOLoss:
     """
     
     def __init__(self, lambda_param: float = 4.0, epsilon: float = 0.2):
+        """
+        Initialize MGPO loss.
+        
+        Args:
+            lambda_param: Entropy penalty weight (Paper uses ~4.0, tune for specific tasks)
+            epsilon: Clipping parameter (Standard PPO/GRPO default: 0.2)
+        """
         self.lambda_param = lambda_param
         self.epsilon = epsilon
     
@@ -1360,7 +1372,7 @@ class CostAnalyzer:
             "signal_stage3": {
                 "steps": 500,
                 "batch_size": 2,
-                "description": "RL - 12K context window"
+                "description": "RL - 32K context window"
             },
         }
         
@@ -2059,7 +2071,7 @@ if __name__ == "__main__":
 - [x] Correct KL divergence entropy weighting
 - [x] Advantage modification (not reward)
 - [x] Custom GRPO trainer with MGPO logic
-- [x] Context window curriculum (4K → 8K → 12K)
+- [x] Context window curriculum (4K → 8K → 32K)
 - [x] Symbolic answer evaluation
 
 ## ✅ Phase 3: Monitoring & Visualization
