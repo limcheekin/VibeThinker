@@ -24,6 +24,7 @@ def test_module_imports():
         },
     ):
         from vibethinker import train_complete
+
         assert train_complete is not None
 
 
@@ -41,6 +42,7 @@ def test_function_exists():
         },
     ):
         from vibethinker.train_complete import train_signal_phase_complete
+
         assert callable(train_signal_phase_complete)
 
 
@@ -60,6 +62,7 @@ def test_function_signature():
         },
     ):
         from vibethinker.train_complete import train_signal_phase_complete
+
         sig = inspect.signature(train_signal_phase_complete)
         params = list(sig.parameters.keys())
         assert "spectrum_model_path" in params
@@ -82,6 +85,7 @@ def test_dependencies_imported():
         },
     ):
         from vibethinker import train_complete
+
         # Check module has expected attributes
         assert hasattr(train_complete, "json")
         assert hasattr(train_complete, "os")
