@@ -126,7 +126,7 @@ def train_signal_phase_complete(
                 )
                 global_step += 1
                 if global_step % config.eval_every == 0:
-                    print(f"\n{'='*70}")
+                    print(f"\n{'=' * 70}")
                     print(f"Step {global_step} / {max_steps}")
                     print(f"Loss: {metrics['loss']:.4f}")
                     print(f"Reward Mean: {metrics['reward_mean']:.4f}")
@@ -134,7 +134,7 @@ def train_signal_phase_complete(
                     print(f"Gradient Norm: {grad_health['total_norm']:.6f}")
                     cost = monitor.metrics_history[-1].estimated_cost_usd
                     print(f"Cumulative Cost: ${cost:.2f}")
-                    print(f"{'='*70}")
+                    print(f"{'=' * 70}")
                     checkpoint_path = f"{output_dir}/checkpoints/step-{global_step}"
                     model.save_pretrained(checkpoint_path)
                     tokenizer.save_pretrained(checkpoint_path)

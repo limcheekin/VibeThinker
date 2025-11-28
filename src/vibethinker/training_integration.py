@@ -89,7 +89,7 @@ def train_signal_phase_with_mgpo(
                             eos_token_id=tokenizer.eos_token_id,
                         )
                     completion = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                    completion = completion[len(prompt_text):].strip()
+                    completion = completion[len(prompt_text) :].strip()
                     problem_completions.append(completion)
                 all_completions.append(problem_completions)
             batch_dict: Dict[str, Any] = {
@@ -107,12 +107,12 @@ def train_signal_phase_with_mgpo(
             samples_processed += len(batch["problem"])
             global_step += 1
             if global_step % eval_every == 0:
-                print(f"\n{'='*70}")
+                print(f"\n{'=' * 70}")
                 print(f"Step {global_step}: Loss = {metrics['loss']:.4f}")
                 print(f"Reward Mean: {metrics['reward_mean']:.4f}")
                 print(f"Entropy Weight Mean: {metrics['entropy_weight_mean']:.4f}")
                 print(f"Advantage Mean: {metrics['advantage_mean']:.4f}")
-                print(f"{'='*70}")
+                print(f"{'=' * 70}")
                 checkpoint_path = f"{output_dir}/checkpoint-{global_step}"
                 model.save_pretrained(checkpoint_path)
                 tokenizer.save_pretrained(checkpoint_path)
