@@ -33,7 +33,7 @@ def fusion_weighted_average(
     assert len(weights) == len(expert_models)
     assert abs(sum(weights) - 1.0) < 1e-6, "Weights must sum to 1.0"
     fused_model = AutoModelForCausalLM.from_pretrained(
-        str(getattr(expert_models[0].config, '_name_or_path', ''))
+        str(getattr(expert_models[0].config, "_name_or_path", ""))
     )
     with torch.no_grad():
         for name, param in fused_model.named_parameters():
@@ -52,7 +52,9 @@ def fusion_task_arithmetic(
     """
     Task arithmetic fusion: fused = base + α * Σ(expert_i - base).
     """
-    fused_model = AutoModelForCausalLM.from_pretrained(str(getattr(base_model.config, '_name_or_path', '')))
+    fused_model = AutoModelForCausalLM.from_pretrained(
+        str(getattr(base_model.config, "_name_or_path", ""))
+    )
     with torch.no_grad():
         for name, param in fused_model.named_parameters():
             base_param = dict(base_model.named_parameters())[name]
@@ -103,8 +105,14 @@ if __name__ == "__main__":
     print("Fusing models with weighted average...")
     fused_model = fusion_weighted_average(experts, weights=[0.25, 0.25, 0.25, 0.25])
     output_path = "checkpoints/vibethinker_spectrum_fused"
-    if hasattr(fused_model, "save_pretrained") and callable(fused_model.save_pretrained):
+    if hasattr(fused_model, "save_pretrained") and callable(
+        fused_model.save_pretrained
+    ):
         fused_model.save_pretrained(output_path)
     else:
-        raise TypeError(f"fused_model does not have a callable save_pretrained method. Type: {type(fused_model)}")
+        raise TypeError(
+            f"""
+            fused_model does not have a callable save_pretrained method.
+            Type: {type(fused_model)}"""
+        )
     print(f"✓ Fused model saved to: {output_path}")
