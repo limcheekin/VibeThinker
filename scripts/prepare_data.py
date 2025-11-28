@@ -18,7 +18,7 @@ def generate_algebra_problem():
     # Ensure integer solution
     x = random.randint(1, 10)
     c = a * x + b
-    
+
     problem = f"Solve for x: {a}x + {b} = {c}"
     answer = str(x)
     return {"problem": problem, "answer": answer}
