@@ -28,7 +28,7 @@ def train_signal_phase_complete(
     output_dir: str = "outputs/vibethinker_complete",
     gpu_type: str = "H100",
     max_steps: int = 2000,
-) -> Tuple[Any, Any, Any]:
+) -> Tuple[str, Any, Any]:
     """
     Complete training with all debugging, visualization, and cost tracking.
     """
@@ -69,14 +69,14 @@ def train_signal_phase_complete(
     print(f"Throughput: {throughput['throughput_tokens_per_sec']:.0f} tokens/sec")
 
     class TrainingConfig:
-        def __init__(self, max_steps):
-            self.learning_rate = 5e-6
-            self.adam_beta1 = 0.9
-            self.adam_beta2 = 0.99
-            self.max_completion_length = 1024
-            self.max_steps = max_steps
-            self.eval_every = 200
-            self.log_every = 10
+        def __init__(self, max_steps: int) -> None:
+            self.learning_rate: float = 5e-6
+            self.adam_beta1: float = 0.9
+            self.adam_beta2: float = 0.99
+            self.max_completion_length: int = 1024
+            self.max_steps: int = max_steps
+            self.eval_every: int = 200
+            self.log_every: int = 10
 
     config = TrainingConfig(max_steps)
 
