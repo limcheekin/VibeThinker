@@ -7,9 +7,4 @@ Please make sure the following commands executed successfully for changes you ma
 - black .
 - isort .
 - flake8 src
-
-
-- pytest
-- black .
-- isort .
-- flake8 src
+- mypy src
