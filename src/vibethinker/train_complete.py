@@ -69,15 +69,16 @@ def train_signal_phase_complete(
     print(f"Throughput: {throughput['throughput_tokens_per_sec']:.0f} tokens/sec")
 
     class TrainingConfig:
-        learning_rate = 5e-6
-        adam_beta1 = 0.9
-        adam_beta2 = 0.99
-        max_completion_length = 1024
-        max_steps = max_steps
-        eval_every = 200
-        log_every = 10
+        def __init__(self, max_steps):
+            self.learning_rate = 5e-6
+            self.adam_beta1 = 0.9
+            self.adam_beta2 = 0.99
+            self.max_completion_length = 1024
+            self.max_steps = max_steps
+            self.eval_every = 200
+            self.log_every = 10
 
-    config = TrainingConfig()
+    config = TrainingConfig(max_steps)
 
     print("\nInitializing MGPO trainer...")
     reward_calc = MGPORewardCalculator(lambda_param=4.0)
