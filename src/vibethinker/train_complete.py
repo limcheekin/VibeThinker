@@ -3,6 +3,7 @@ Complete VibeThinker training pipeline with monitoring, visualization,
 proper MGPO, and cost tracking.
 """
 
+import argparse
 import json
 import os
 from typing import Any, Tuple
@@ -187,19 +188,28 @@ def train_signal_phase_complete(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--spectrum-path", type=str, required=True)
+    parser.add_argument(
+        "--output-dir", type=str, default="outputs/vibethinker_complete"
+    )
+    parser.add_argument("--gpu-type", type=str, default="H100")
+    parser.add_argument("--max-steps", type=int, default=2000)
+    args = parser.parse_args()
+
     train_dataset = load_dataset(
         "json", data_files="data/algebra_train.jsonl", split="train"
     )
     val_dataset = load_dataset(
         "json", data_files="data/algebra_val.jsonl", split="train"
     )
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")  # type: ignore
+    tokenizer = AutoTokenizer.from_pretrained(args.spectrum_path)  # type: ignore
     train_signal_phase_complete(
-        spectrum_model_path="checkpoints/vibethinker_spectrum",
+        spectrum_model_path=args.spectrum_path,
         train_dataset=train_dataset,
         val_dataset=val_dataset,
         tokenizer=tokenizer,
-        output_dir="outputs/vibethinker_complete",
-        gpu_type="H100",
-        max_steps=2000,
+        output_dir=args.output_dir,
+        gpu_type=args.gpu_type,
+        max_steps=args.max_steps,
     )
