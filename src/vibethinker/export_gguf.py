@@ -24,6 +24,13 @@ def export_to_gguf(
     """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     if use_llama_cpp:
+        if not os.path.exists("llama.cpp"):
+            print("ERROR: llama.cpp not found in current directory.")
+            print("Please run 'scripts/setup_llama_cpp.sh' or clone it manually:")
+            print("  git clone https://github.com/ggerganov/llama.cpp")
+            print("  cd llama.cpp && make")
+            raise FileNotFoundError("llama.cpp directory not found")
+
         print("Using llama.cpp for GGUF conversion...")
         temp_fp16 = output_path.replace(".gguf", "-fp16.gguf")
         print(f"Step 1/2: Converting {model_path} to FP16 GGUF...")

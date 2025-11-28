@@ -102,3 +102,6 @@ venv.bak/
 
 # VS Code
 .vscode/
+
+# Data
+data/
