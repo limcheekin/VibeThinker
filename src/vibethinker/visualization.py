@@ -144,7 +144,7 @@ class GenerationAnalyzer:
     ) -> None:
         """Visualize diversity analysis."""
         solutions = analysis["solutions"]
-        lengths = [len(s) for s in solutions]
+        lengths = [len(s.split()) for s in solutions]
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         axes[0].hist(lengths, bins=15, alpha=0.7, color="blue", edgecolor="black")
         axes[0].axvline(

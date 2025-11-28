@@ -49,7 +49,7 @@ def train_signal_phase_with_mgpo(
         reward_calculator=reward_calc,
         device="cuda",
     )
-    monitor = TrainingMonitor(output_dir="monitoring")
+    monitor = TrainingMonitor(output_dir=output_dir)
     analyzer = GenerationAnalyzer(model, tokenizer)
     print("\n" + "=" * 70)
     print("SIGNAL PHASE TRAINING WITH MGPO")
