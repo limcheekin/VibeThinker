@@ -190,7 +190,7 @@ class MGPOTrainerWithEntropyWeighting:
             response_lengths=torch.ones_like(advantages),
         )
         self.optimizer.zero_grad()
-        loss.backward()
+        loss.backward()  # type: ignore
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
         self.optimizer.step()
         return {

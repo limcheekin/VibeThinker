@@ -193,7 +193,7 @@ if __name__ == "__main__":
     val_dataset = load_dataset(
         "json", data_files="data/algebra_val.jsonl", split="train"
     )
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")  # type: ignore
     train_signal_phase_complete(
         spectrum_model_path="checkpoints/vibethinker_spectrum",
         train_dataset=train_dataset,

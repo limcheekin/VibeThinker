@@ -83,14 +83,14 @@ class TrainingDebugger:
         for name, module in model.named_modules():
             if isinstance(module, torch.nn.Linear):
                 if hasattr(module, "_last_output"):
-                    output = module._last_output
+                    output: torch.Tensor = module._last_output  # type: ignore
                     stats: Dict[str, Any] = {
                         "mean": output.mean().item(),
                         "std": output.std().item(),
                         "min": output.min().item(),
                         "max": output.max().item(),
                     }
-                    if output.std() < 1e-6:
+                    if float(output.std()) < 1e-6:
                         stats["warning"] = "Potential dead neurons"
                         dead_neuron_count += 1
                     activation_stats[name] = stats
@@ -106,14 +106,14 @@ class TrainingDebugger:
         model.eval()
         with torch.no_grad():
             inputs = tokenizer(prompt, return_tensors="pt")
-            output = model.generate(
+            output_obj = model.generate(
                 inputs["input_ids"],
                 max_length=max_length,
                 output_scores=True,
                 return_dict_in_generate=True,
                 temperature=0.7,
             )
-            text = tokenizer.decode(output.sequences[0], skip_special_tokens=True)
+            text = tokenizer.decode(output_obj.sequences[0], skip_special_tokens=True)
         issues: List[str] = []
         words = text.split()
         if len(words) > 0 and len(set(words)) / len(words) < 0.3:
@@ -142,7 +142,7 @@ class PerformanceInspector:
         """Profile GPU memory usage."""
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
-        dummy_input = torch.randint(0, 50000, (batch_size, seq_len)).cuda()
+        dummy_input = torch.randint(0, 50000, (batch_size, seq_len), device="cuda")
         with torch.profiler.profile(
             activities=[torch.profiler.ProfilerActivity.CUDA],
             on_trace_ready=torch.profiler.tensorboard_trace_handler("profile_logs"),
@@ -164,7 +164,7 @@ class PerformanceInspector:
         import time
 
         model.train()
-        dummy_input = torch.randint(0, 50000, (4, 512)).cuda()
+        dummy_input = torch.randint(0, 50000, (4, 512), device="cuda")
         for _ in range(3):
             with torch.no_grad():
                 _ = model(input_ids=dummy_input, labels=dummy_input)
