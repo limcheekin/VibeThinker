@@ -183,10 +183,10 @@ class MGPOTrainerWithEntropyWeighting:
         
         # Calculate prompt lengths to mask them out
         # Note: We tokenize prompts separately to get exact lengths
-        # Using the same tokenizer settings ensures consistency
+        # FIX: return_tensors=None to avoid error with variable lengths + no padding
         prompt_inputs = self.tokenizer(
             flat_prompts, 
-            return_tensors="pt", 
+            return_tensors=None, 
             padding=False,
             add_special_tokens=True 
         )
