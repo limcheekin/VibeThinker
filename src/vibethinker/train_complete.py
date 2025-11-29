@@ -165,7 +165,7 @@ def train_signal_phase_complete(
                         with torch.no_grad():
                             outputs = model.generate(
                                 **inputs,
-                                max_length=config.max_completion_length,
+                                max_new_tokens=config.max_completion_length,
                                 temperature=0.8,
                                 do_sample=True,
                                 pad_token_id=tokenizer.pad_token_id,

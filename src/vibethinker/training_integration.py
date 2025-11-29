@@ -81,7 +81,7 @@ def train_signal_phase_with_mgpo(
                     with torch.no_grad():
                         outputs = model.generate(
                             inputs["input_ids"],
-                            max_length=config.max_completion_length,
+                            max_new_tokens=config.max_completion_length,
                             temperature=0.7,
                             top_p=0.95,
                             do_sample=True,

@@ -124,7 +124,7 @@ def main(config):
                 add_generation_prompt=True,
                 padding=True,
                 truncation=True,
-                max_length=config.rollout.prompt_length,
+                max_new_tokens=config.rollout.prompt_length,
                 return_tensors="pt",
                 return_dict=True,
                 tokenize=True,

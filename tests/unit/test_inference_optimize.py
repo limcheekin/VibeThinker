@@ -73,7 +73,7 @@ def test_generate_optimized():
                 )
 
                 result = inference.generate_optimized(
-                    prompt="Test prompt", max_length=512, temperature=0.7
+                    prompt="Test prompt", max_new_tokens=512, temperature=0.7
                 )
 
                 assert isinstance(result, str)
@@ -100,7 +100,7 @@ def test_generate_optimized_parameters():
 
                 result = inference.generate_optimized(
                     prompt="Test",
-                    max_length=256,
+                    max_new_tokens=256,
                     num_beams=4,
                     temperature=0.5,
                     use_cache=False,
@@ -133,7 +133,7 @@ def test_batch_generate():
                 inference = OptimizedInference(mock_model, mock_tokenizer)
 
                 prompts = ["Test 1", "Test 2"]
-                results = inference.batch_generate(prompts, max_length=128)
+                results = inference.batch_generate(prompts, max_new_tokens=128)
 
                 assert len(results) == 2
                 assert results[0] == "Output 1"
@@ -159,7 +159,7 @@ def test_batch_generate_with_kwargs():
                 inference = OptimizedInference(mock_model, mock_tokenizer)
 
                 results = inference.batch_generate(
-                    prompts=["Test"], max_length=256, temperature=0.8, top_p=0.95
+                    prompts=["Test"], max_new_tokens=256, temperature=0.8, top_p=0.95
                 )
 
                 assert len(results) == 1

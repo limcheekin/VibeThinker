@@ -55,7 +55,7 @@ class AttentionVisualizer:
         Visualize attention patterns for a given input.
         """
         tokens = self.tokenizer(
-            text, return_tensors="pt", max_length=max_seq_len, truncation=True
+            text, return_tensors="pt", max_new_tokens=max_seq_len, truncation=True
         )
         self.register_hooks()
         with torch.no_grad():
@@ -103,14 +103,14 @@ class GenerationAnalyzer:
         self.output_dir.mkdir(exist_ok=True)
 
     def analyze_diversity(
-        self, prompt: str, num_generations: int = 16, max_length: int = 256
+        self, prompt: str, num_generations: int = 16, max_new_tokens: int = 256
     ) -> Dict[str, Any]:
         """Analyze diversity of multiple generations."""
         solutions: List[str] = []
         for _ in range(num_generations):
             output = self.model.generate(
                 self.tokenizer(prompt, return_tensors="pt").input_ids,
-                max_length=max_length,
+                max_new_tokens=max_new_tokens,
                 temperature=0.7,
                 top_p=0.95,
                 do_sample=True,

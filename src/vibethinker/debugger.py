@@ -100,7 +100,7 @@ class TrainingDebugger:
         }
 
     def debug_generation(
-        self, model: Any, tokenizer: Any, prompt: str, max_length: int = 256
+        self, model: Any, tokenizer: Any, prompt: str, max_new_tokens: int = 256
     ) -> Dict[str, Any]:
         """Debug generation quality and issues."""
         model.eval()
@@ -108,7 +108,7 @@ class TrainingDebugger:
             inputs = tokenizer(prompt, return_tensors="pt")
             output_obj = model.generate(
                 inputs["input_ids"],
-                max_length=max_length,
+                max_new_tokens=max_new_tokens,
                 output_scores=True,
                 return_dict_in_generate=True,
                 temperature=0.7,
@@ -120,8 +120,8 @@ class TrainingDebugger:
             issues.append("High token repetition detected")
         if len(words) < 10:
             issues.append("Generated text too short")
-        elif len(words) > max_length * 0.95:
-            issues.append("Hit max_length limit (model may be truncated)")
+        elif len(words) > max_new_tokens * 0.95:
+            issues.append("Hit max_new_tokens limit (model may be truncated)")
         if any(token in text.lower() for token in ["<unk>", "[unk]", "error"]):
             issues.append("Contains unknown tokens or errors")
         return {

@@ -638,7 +638,7 @@ class AttentionVisualizer:
         tokens = self.tokenizer(
             text,
             return_tensors="pt",
-            max_length=max_seq_len,
+            max_new_tokens=max_seq_len,
             truncation=True
         )
         
@@ -701,7 +701,7 @@ class GenerationAnalyzer:
         self.output_dir.mkdir(exist_ok=True)
     
     def analyze_diversity(self, prompt: str, num_generations: int = 16,
-                         max_length: int = 256) -> Dict:
+                         max_new_tokens: int = 256) -> Dict:
         """Analyze diversity of multiple generations."""
         
         # Generate multiple solutions
@@ -709,7 +709,7 @@ class GenerationAnalyzer:
         for _ in range(num_generations):
             output = self.model.generate(
                 self.tokenizer(prompt, return_tensors="pt").input_ids,
-                max_length=max_length,
+                max_new_tokens=max_new_tokens,
                 temperature=0.7,
                 top_p=0.95,
                 do_sample=True,
@@ -1082,7 +1082,7 @@ class MGPOTrainerWithEntropyWeighting:
             # Tokenize completions
             completion_tokens_list = [
                 [self.tokenizer(c, return_tensors="pt", truncation=True,
-                               max_length=self.config.max_completion_length)
+                               max_new_tokens=self.config.max_completion_length)
                  for c in comp_group]
                 for comp_group in completions
             ]
@@ -1094,7 +1094,7 @@ class MGPOTrainerWithEntropyWeighting:
                 for c in comp_group:
                     tokens = self.tokenizer(c, return_tensors="pt",
                                           truncation=True,
-                                          max_length=self.config.max_completion_length)
+                                          max_new_tokens=self.config.max_completion_length)
                     with torch.no_grad():
                         outputs = self.model(**{k: v.to(self.device)
                                               for k, v in tokens.items()})
@@ -1120,7 +1120,7 @@ class MGPOTrainerWithEntropyWeighting:
             for c in comp_group:
                 tokens = self.tokenizer(c, return_tensors="pt",
                                       truncation=True,
-                                      max_length=self.config.max_completion_length)
+                                      max_new_tokens=self.config.max_completion_length)
                 outputs = self.model(**{k: v.to(self.device) for k, v in tokens.items()})
                 
                 log_p = self.loss_fn.compute_log_probabilities(
@@ -1299,7 +1299,7 @@ def train_signal_phase_with_mgpo(
                     with torch.no_grad():
                         outputs = model.generate(
                             inputs["input_ids"],
-                            max_length=config.max_completion_length,
+                            max_new_tokens=config.max_completion_length,
                             temperature=0.7,  # Sampling for diversity
                             top_p=0.95,
                             do_sample=True,
@@ -1886,7 +1886,7 @@ class TrainingDebugger:
         }
     
     def debug_generation(self, model, tokenizer, prompt: str,
-                        max_length: int = 256) -> Dict:
+                        max_new_tokens: int = 256) -> Dict:
         """Debug generation quality and issues."""
         
         model.eval()
@@ -1896,7 +1896,7 @@ class TrainingDebugger:
             # Generate with tracking
             output = model.generate(
                 inputs["input_ids"],
-                max_length=max_length,
+                max_new_tokens=max_new_tokens,
                 output_scores=True,
                 return_dict_in_generate=True,
                 temperature=0.7,
@@ -1915,8 +1915,8 @@ class TrainingDebugger:
             # Check for length
             if len(words) < 10:
                 issues.append("Generated text too short")
-            elif len(words) > max_length * 0.95:
-                issues.append("Hit max_length limit (model may be truncated)")
+            elif len(words) > max_new_tokens * 0.95:
+                issues.append("Hit max_new_tokens limit (model may be truncated)")
             
             # Check for coherence
             if any(token in text.lower() for token in ["<unk>", "[unk]", "error"]):
@@ -2391,7 +2391,7 @@ def validate_fusion(fused_model, tokenizer, test_problems: List[Dict]):
             with torch.no_grad():
                 outputs = fused_model.generate(
                     inputs["input_ids"],
-                    max_length=512,
+                    max_new_tokens=512,
                     temperature=0.7,
                     do_sample=True,
                 )
@@ -2704,7 +2704,7 @@ class OptimizedInference:
         if hasattr(torch, 'compile'):
             self.model = torch.compile(self.model, mode="reduce-overhead")
     
-    def generate_optimized(self, prompt: str, max_length: int = 512, 
+    def generate_optimized(self, prompt: str, max_new_tokens: int = 512, 
                           num_beams: int = 1, temperature: float = 0.7,
                           use_cache: bool = True) -> str:
         """
@@ -2721,7 +2721,7 @@ class OptimizedInference:
             with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
                 outputs = self.model.generate(
                     inputs["input_ids"],
-                    max_length=max_length,
+                    max_new_tokens=max_new_tokens,
                     num_beams=num_beams,
                     temperature=temperature,
                     do_sample=(temperature > 0),

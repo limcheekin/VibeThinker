@@ -177,7 +177,7 @@ class MGPOTrainerWithEntropyWeighting:
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=max_len,
+            max_new_tokens=max_len,
         ).to(self.device)
 
         # 4. Forward Pass

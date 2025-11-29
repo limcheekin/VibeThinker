@@ -23,7 +23,7 @@ class OptimizedInference:
     def generate_optimized(
         self,
         prompt: str,
-        max_length: int = 512,
+        max_new_tokens: int = 512,
         num_beams: int = 1,
         temperature: float = 0.7,
         use_cache: bool = True,
@@ -36,7 +36,7 @@ class OptimizedInference:
             with torch.autocast(device_type=self.device, dtype=torch.bfloat16):
                 outputs = self.model.generate(
                     inputs["input_ids"],
-                    max_length=max_length,
+                    max_new_tokens=max_new_tokens,
                     num_beams=num_beams,
                     temperature=temperature,
                     do_sample=(temperature > 0),

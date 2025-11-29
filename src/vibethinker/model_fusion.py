@@ -81,7 +81,7 @@ def validate_fusion(
             with torch.no_grad():
                 outputs = fused_model.generate(
                     inputs["input_ids"],
-                    max_length=512,
+                    max_new_tokens=512,
                     temperature=0.7,
                     do_sample=True,
                 )
