@@ -269,7 +269,7 @@ class MGPOTrainerWithEntropyWeighting:
         )
 
         self.optimizer.zero_grad()
-        loss.backward()
+        loss.backward()  # type: ignore[no-untyped-call]
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
         self.optimizer.step()
 

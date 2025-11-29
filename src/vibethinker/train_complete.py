@@ -294,7 +294,7 @@ if __name__ == "__main__":
     val_dataset = load_dataset(
         "json", data_files="data/algebra_val.jsonl", split="train"
     )
-    tokenizer = AutoTokenizer.from_pretrained(args.spectrum_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.spectrum_path)  # type: ignore[no-untyped-call]
 
     train_signal_phase_complete(
         spectrum_model_path=args.spectrum_path,
