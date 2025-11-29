@@ -117,11 +117,12 @@ class MGPOTrainerWithEntropyWeighting:
     ) -> torch.Tensor:
         """
         Compute token-level log probabilities.
-        Returns tensor of shape (Batch, Seq) aligned with input_ids.
+        Returns tensor of shape aligned with input_ids (Batch, ..., Seq).
         """
-        logits = model_output.logits  # (Batch, Seq, Vocab)
+        logits = model_output.logits  # (..., Seq, Vocab)
         
         # Shift logits: logits[t] predicts input_ids[t+1]
+        # Supports arbitrary batch dimensions using ellipsis ...
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = input_ids[..., 1:].contiguous()
         
@@ -129,16 +130,21 @@ class MGPOTrainerWithEntropyWeighting:
         log_probs = F.log_softmax(shift_logits, dim=-1)
         
         # Gather probabilities of actual tokens
-        # Shape: (Batch, Seq-1)
+        # Output Shape matches shift_labels: (..., Seq-1)
         token_log_probs = log_probs.gather(-1, shift_labels.unsqueeze(-1)).squeeze(-1)
         
         # Prepend zero to match input sequence length
+        # Dynamically create prefix shape to match leading dimensions
+        prefix_shape = list(token_log_probs.shape)
+        prefix_shape[-1] = 1
+        
         prefix = torch.zeros(
-            token_log_probs.size(0), 1, 
+            prefix_shape, 
             device=token_log_probs.device, 
             dtype=token_log_probs.dtype
         )
-        return torch.cat([prefix, token_log_probs], dim=1)
+        # Use dim=-1 to concatenate along the sequence dimension regardless of batch rank
+        return torch.cat([prefix, token_log_probs], dim=-1)
 
     def _process_batch_log_probs(
         self, prompts: List[str], completions: List[List[str]], is_training: bool = False
@@ -161,12 +167,15 @@ class MGPOTrainerWithEntropyWeighting:
         full_texts = [p + c for p, c in zip(flat_prompts, flat_completions)]
         
         # 3. Tokenize Full Texts (Padding enabled)
+        # Use max_seq_length from config if available, else max_completion_length
+        max_len = getattr(self.config, "max_seq_length", 4096)
+        
         inputs = self.tokenizer(
             full_texts,
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.config.max_completion_length,
+            max_length=max_len,
         ).to(self.device)
         
         # 4. Forward Pass
@@ -183,7 +192,7 @@ class MGPOTrainerWithEntropyWeighting:
         
         # Calculate prompt lengths to mask them out
         # Note: We tokenize prompts separately to get exact lengths
-        # FIX: return_tensors=None to avoid error with variable lengths + no padding
+        # return_tensors=None to allow variable length lists (no padding needed here)
         prompt_inputs = self.tokenizer(
             flat_prompts, 
             return_tensors=None, 
