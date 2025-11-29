@@ -134,7 +134,7 @@ def train_signal_phase_complete(
     num_epochs = (max_steps // steps_per_epoch) + 1
 
     for epoch in range(num_epochs):
-        pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}")
+        pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}")
         for batch in pbar:
             if global_step >= max_steps:
                 break
