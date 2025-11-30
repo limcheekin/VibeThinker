@@ -9,10 +9,15 @@ import os
 from typing import Any, Dict, List
 
 import numpy as np
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizer,
+)
 
-from .monitor import MGPORewardCalculator
 from .inference_optimize import OptimizedInference
+from .monitor import MGPORewardCalculator
 
 BENCHMARKS = {
     "AIME": "data/aime24_25.jsonl",
@@ -26,8 +31,6 @@ def load_benchmark(path: str) -> List[Dict[str, Any]]:
     with open(path) as f:
         return [json.loads(line) for line in f]
 
-
-from transformers import PreTrainedModel, PreTrainedTokenizer
 
 def evaluate_model(
     model: PreTrainedModel,

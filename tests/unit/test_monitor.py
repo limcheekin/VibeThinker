@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from vibethinker.monitor import (
+    CodeRewardCalculator,
     CostCalculator,
     CPUMetrics,
     CPUMonitor,
@@ -390,3 +391,173 @@ def test_mgpo_reward_calculator_empty_completions():
     rewards, entropy_info = calc.compute_rewards(prompts, completions, references)
 
     assert len(rewards[0]) == 0
+
+
+# CodeRewardCalculator Tests
+
+
+def test_code_reward_calculator_init():
+    """Test CodeRewardCalculator initialization."""
+    calc = CodeRewardCalculator(timeout=3.0)
+    assert calc.timeout == 3.0
+
+
+def test_evaluate_code_correct():
+    """Test correct code evaluation."""
+    calc = CodeRewardCalculator()
+
+    code = """
+def add(a, b):
+    return a + b
+"""
+
+    test_cases = [
+        {"input": [1, 2], "output": 3},
+        {"input": [5, 7], "output": 12},
+    ]
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 1.0
+
+
+def test_evaluate_code_syntax_error():
+    """Test code evaluation with syntax error."""
+    calc = CodeRewardCalculator()
+
+    code = """
+def add(a, b
+    return a + b  # Missing closing parenthesis
+"""
+
+    test_cases = [{"input": [1, 2], "output": 3}]
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 0.0
+
+
+def test_evaluate_code_runtime_error():
+    """Test code evaluation with runtime error."""
+    calc = CodeRewardCalculator()
+
+    code = """
+def divide(a, b):
+    return a / b
+"""
+
+    test_cases = [{"input": [1, 0], "output": 0}]  # Division by zero
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 0.0
+
+
+def test_evaluate_code_timeout():
+    """Test code evaluation with timeout."""
+    calc = CodeRewardCalculator(timeout=0.1)
+
+    code = """
+def infinite_loop():
+    while True:
+        pass
+"""
+
+    test_cases = [{"input": [], "output": None}]
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 0.0
+
+
+def test_evaluate_code_test_case_failure():
+    """Test code evaluation when test cases fail."""
+    calc = CodeRewardCalculator()
+
+    code = """
+def add(a, b):
+    return a - b  # Wrong operation
+"""
+
+    test_cases = [{"input": [1, 2], "output": 3}]
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 0.0
+
+
+def test_compute_rewards_code():
+    """Test batch reward computation for code."""
+    calc = CodeRewardCalculator()
+
+    prompts = ["Write add function", "Write multiply function"]
+    completions = [
+        ["def add(a, b):\n    return a + b", "def add(a, b):\n    return a - b"],
+        ["def mul(a, b):\n    return a * b", "def mul(a, b):\n    return a + b"],
+    ]
+    test_suites = [
+        [{"input": [1, 2], "output": 3}],
+        [{"input": [2, 3], "output": 6}],
+    ]
+
+    rewards, infos = calc.compute_rewards(prompts, completions, test_suites)
+
+    assert len(rewards) == 2
+    assert len(infos) == 2
+    assert len(rewards[0]) == 2
+    assert len(rewards[1]) == 2
+    assert all(info["entropy_weight"] == 1.0 for info in infos)
+
+
+def test_extract_code():
+    """Test code extraction from markdown."""
+    calc = CodeRewardCalculator()
+
+    # Test with markdown code block
+    text_with_markdown = """
+Here is the solution:
+
+```python
+def add(a, b):
+    return a + b
+```
+"""
+
+    extracted = calc._extract_code(text_with_markdown)
+    assert "def add(a, b):" in extracted
+    assert "```" not in extracted
+
+    # Test without markdown
+    plain_code = "def add(a, b):\n    return a + b"
+    extracted = calc._extract_code(plain_code)
+    assert extracted == plain_code
+
+
+def test_evaluate_code_no_functions():
+    """Test evaluation when code defines no functions."""
+    calc = CodeRewardCalculator()
+
+    code = """
+x = 5
+y = 10
+"""
+
+    test_cases = [{"input": [], "output": 15}]
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 0.0  # No callable function found
+
+
+def test_evaluate_code_partial_pass():
+    """Test that code must pass all test cases."""
+    calc = CodeRewardCalculator()
+
+    code = """
+def add(a, b):
+    if a == 1 and b == 2:
+        return 3
+    return 0
+"""
+
+    test_cases = [
+        {"input": [1, 2], "output": 3},  # Passes
+        {"input": [2, 3], "output": 5},  # Fails
+    ]
+
+    result = calc.evaluate_code(code, test_cases)
+    assert result == 0.0  # Should fail because not all tests pass

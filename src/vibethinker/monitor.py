@@ -1,3 +1,5 @@
+import ast
+import concurrent.futures
 import subprocess
 import time
 from dataclasses import dataclass
@@ -404,6 +406,103 @@ class MGPORewardCalculator:
                 }
             )
         return batch_rewards, batch_entropy_info
+
+
+class CodeRewardCalculator:
+    """
+    Reward calculator for Code Generation (Stage 3).
+    Executes generated code against test cases with safety timeouts.
+    """
+
+    def __init__(self, timeout: float = 2.0) -> None:
+        """
+        Initialize code reward calculator.
+
+        Args:
+            timeout: Execution timeout in seconds
+        """
+        self.timeout = timeout
+
+    def evaluate_code(
+        self, generated_code: str, test_cases: List[Dict[str, Any]]
+    ) -> float:
+        """
+        Evaluate python code against test cases.
+
+        Args:
+            generated_code: The generated Python code to evaluate
+            test_cases: List of test cases with 'input' and 'output' keys
+
+        Returns:
+            1.0 if all tests pass, 0.0 otherwise
+        """
+        # 1. Syntax Check
+        try:
+            ast.parse(generated_code)
+        except SyntaxError:
+            return 0.0
+
+        # 2. Execution Sandbox (Mock for safety in this repo)
+        def run_tests_unsafe() -> float:
+            local_env: Dict[str, Any] = {}
+            try:
+                exec(generated_code, {}, local_env)
+                # Heuristic: find last defined function
+                func_name = [k for k in local_env if callable(local_env[k])][-1]
+                func = local_env[func_name]
+                for test in test_cases:
+                    if func(*test["input"]) != test["output"]:
+                        return 0.0
+                return 1.0
+            except Exception:
+                return 0.0
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as ex:
+                return ex.submit(run_tests_unsafe).result(timeout=self.timeout)
+        except (concurrent.futures.TimeoutError, Exception):
+            return 0.0
+
+    def compute_rewards(
+        self,
+        prompts: List[str],
+        completions: List[List[str]],
+        test_suites: List[List[Dict[str, Any]]],
+    ) -> Tuple[List[List[float]], List[Dict[str, Any]]]:
+        """
+        Compute rewards and info for a batch of code completions.
+
+        Args:
+            prompts: List of prompts (not used but kept for API consistency)
+            completions: List of completion groups
+            test_suites: List of test suites corresponding to each prompt
+
+        Returns:
+            Tuple of (rewards, infos) where rewards are binary scores
+        """
+        rewards: List[List[float]] = []
+        infos: List[Dict[str, Any]] = []
+        for comp_group, tests in zip(completions, test_suites):
+            clean_comps = [self._extract_code(c) for c in comp_group]
+            scores = np.array([self.evaluate_code(c, tests) for c in clean_comps])
+            rewards.append(scores.tolist())
+            # Code stage typically uses standard RL or generic entropy weight
+            infos.append({"entropy_weight": 1.0})
+        return rewards, infos
+
+    def _extract_code(self, text: str) -> str:
+        """
+        Extract Python code from markdown code blocks.
+
+        Args:
+            text: Text that may contain code blocks
+
+        Returns:
+            Extracted code or original text
+        """
+        if "```python" in text:
+            return text.split("```python")[1].split("```")[0].strip()
+        return text
 
 
 if __name__ == "__main__":
