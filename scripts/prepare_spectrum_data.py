@@ -181,7 +181,9 @@ def prepare(
     for vt_domain, cats in domain_map.items():
         logging.info("Processing domain '%s' -> categories %s", vt_domain, cats)
 
-        def keep_fn(example: Dict[str, str], cats: List[str] = cats, field: str = domain_field) -> bool:
+        def keep_fn(
+            example: Dict[str, str], cats: List[str] = cats, field: str = domain_field
+        ) -> bool:
             val = example.get(field, "")
             if isinstance(val, list):
                 return any(c in val for c in cats)
