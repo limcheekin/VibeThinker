@@ -1,5 +1,5 @@
 import ast
-import concurrent.futures
+import multiprocessing
 import subprocess
 import time
 from dataclasses import dataclass
@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import multiprocessing
 import psutil
 
 
@@ -410,7 +409,9 @@ class MGPORewardCalculator:
 
 
 def _unsafe_code_execution_worker(
-    generated_code: str, test_cases: List[Dict[str, Any]], result_queue: multiprocessing.Queue
+    generated_code: str,
+    test_cases: List[Dict[str, Any]],
+    result_queue: "multiprocessing.Queue[float]",
 ) -> None:
     """Worker function for unsafe code execution."""
     try:
@@ -421,7 +422,7 @@ def _unsafe_code_execution_worker(
         if not func_names:
             result_queue.put(0.0)
             return
-            
+
         func_name = func_names[-1]
         func = local_env[func_name]
         for test in test_cases:
@@ -468,25 +469,25 @@ class CodeRewardCalculator:
             return 0.0
 
         # 2. Execution Sandbox (Multiprocessing for timeout safety)
-        queue = multiprocessing.Queue()
+        queue: "multiprocessing.Queue[float]" = multiprocessing.Queue()
         p = multiprocessing.Process(
             target=_unsafe_code_execution_worker,
             args=(generated_code, test_cases, queue),
         )
-        
+
         try:
             p.start()
             p.join(self.timeout)
-            
+
             if p.is_alive():
                 p.terminate()
                 p.join()
                 return 0.0
-                
+
             if not queue.empty():
                 return queue.get()
             return 0.0
-            
+
         except Exception:
             if p.is_alive():
                 p.terminate()
