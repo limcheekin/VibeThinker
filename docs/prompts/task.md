@@ -2,7 +2,7 @@
 Mock unsloth and FastLanguageModel to allow tests to run without the dependency.
 Remove pytest.skip and implement proper mocking.
 
-Please make sure the following commands executed successfully for changes you made:
+Please activate .venv and ensure the following commands executed successfully for changes you made:
 - pytest
 - black .
 - isort .
