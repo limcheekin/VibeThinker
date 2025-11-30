@@ -99,8 +99,12 @@ def test_probe_domain(mock_reward_calc_class, mock_flm):
     # Mock tokenizer behavior - return proper object that can be unpacked
     def mock_tokenizer_call(*args, **kwargs):
         obj = Mock()
-        inputs_obj = Mock()
+        inputs_obj = MagicMock()
         inputs_obj.input_ids = Mock(shape=(1, 10))
+        # Make it behave like a dict for ** unpacking
+        inputs_obj.__iter__.return_value = iter(["input_ids"])
+        inputs_obj.keys.return_value = ["input_ids"]
+        inputs_obj.__getitem__.return_value = inputs_obj.input_ids
         obj.to = Mock(return_value=inputs_obj)
         return obj
 
@@ -108,7 +112,7 @@ def test_probe_domain(mock_reward_calc_class, mock_flm):
     mock_tokenizer.pad_token_id = 0
 
     # Mock model generation - return 4 sequences
-    mock_outputs = [Mock() for _ in range(4)]
+    mock_outputs = [MagicMock() for _ in range(4)]
     mock_model.generate.return_value = mock_outputs
 
     # Mock tokenizer decode
@@ -150,15 +154,19 @@ def test_probe_domain_all_correct(mock_reward_calc_class, mock_flm):
 
     def mock_tokenizer_call(*args, **kwargs):
         obj = Mock()
-        inputs_obj = Mock()
+        inputs_obj = MagicMock()
         inputs_obj.input_ids = Mock(shape=(1, 10))
+        # Make it behave like a dict for ** unpacking
+        inputs_obj.__iter__.return_value = iter(["input_ids"])
+        inputs_obj.keys.return_value = ["input_ids"]
+        inputs_obj.__getitem__.return_value = inputs_obj.input_ids
         obj.to = Mock(return_value=inputs_obj)
         return obj
 
     mock_tokenizer.side_effect = mock_tokenizer_call
     mock_tokenizer.pad_token_id = 0
 
-    mock_outputs = [Mock() for _ in range(4)]
+    mock_outputs = [MagicMock() for _ in range(4)]
     mock_model.generate.return_value = mock_outputs
     mock_tokenizer.decode.return_value = "42"
 
@@ -188,15 +196,19 @@ def test_probe_domain_none_correct(mock_reward_calc_class, mock_flm):
 
     def mock_tokenizer_call(*args, **kwargs):
         obj = Mock()
-        inputs_obj = Mock()
+        inputs_obj = MagicMock()
         inputs_obj.input_ids = Mock(shape=(1, 10))
+        # Make it behave like a dict for ** unpacking
+        inputs_obj.__iter__.return_value = iter(["input_ids"])
+        inputs_obj.keys.return_value = ["input_ids"]
+        inputs_obj.__getitem__.return_value = inputs_obj.input_ids
         obj.to = Mock(return_value=inputs_obj)
         return obj
 
     mock_tokenizer.side_effect = mock_tokenizer_call
     mock_tokenizer.pad_token_id = 0
 
-    mock_outputs = [Mock() for _ in range(4)]
+    mock_outputs = [MagicMock() for _ in range(4)]
     mock_model.generate.return_value = mock_outputs
     mock_tokenizer.decode.return_value = "wrong"
 

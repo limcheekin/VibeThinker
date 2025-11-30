@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import multiprocessing
 import psutil
 
 
@@ -408,6 +409,30 @@ class MGPORewardCalculator:
         return batch_rewards, batch_entropy_info
 
 
+def _unsafe_code_execution_worker(
+    generated_code: str, test_cases: List[Dict[str, Any]], result_queue: multiprocessing.Queue
+) -> None:
+    """Worker function for unsafe code execution."""
+    try:
+        local_env: Dict[str, Any] = {}
+        exec(generated_code, {}, local_env)
+        # Heuristic: find last defined function
+        func_names = [k for k in local_env if callable(local_env[k])]
+        if not func_names:
+            result_queue.put(0.0)
+            return
+            
+        func_name = func_names[-1]
+        func = local_env[func_name]
+        for test in test_cases:
+            if func(*test["input"]) != test["output"]:
+                result_queue.put(0.0)
+                return
+        result_queue.put(1.0)
+    except Exception:
+        result_queue.put(0.0)
+
+
 class CodeRewardCalculator:
     """
     Reward calculator for Code Generation (Stage 3).
@@ -442,25 +467,30 @@ class CodeRewardCalculator:
         except SyntaxError:
             return 0.0
 
-        # 2. Execution Sandbox (Mock for safety in this repo)
-        def run_tests_unsafe() -> float:
-            local_env: Dict[str, Any] = {}
-            try:
-                exec(generated_code, {}, local_env)
-                # Heuristic: find last defined function
-                func_name = [k for k in local_env if callable(local_env[k])][-1]
-                func = local_env[func_name]
-                for test in test_cases:
-                    if func(*test["input"]) != test["output"]:
-                        return 0.0
-                return 1.0
-            except Exception:
-                return 0.0
-
+        # 2. Execution Sandbox (Multiprocessing for timeout safety)
+        queue = multiprocessing.Queue()
+        p = multiprocessing.Process(
+            target=_unsafe_code_execution_worker,
+            args=(generated_code, test_cases, queue),
+        )
+        
         try:
-            with concurrent.futures.ThreadPoolExecutor() as ex:
-                return ex.submit(run_tests_unsafe).result(timeout=self.timeout)
-        except (concurrent.futures.TimeoutError, Exception):
+            p.start()
+            p.join(self.timeout)
+            
+            if p.is_alive():
+                p.terminate()
+                p.join()
+                return 0.0
+                
+            if not queue.empty():
+                return queue.get()
+            return 0.0
+            
+        except Exception:
+            if p.is_alive():
+                p.terminate()
+                p.join()
             return 0.0
 
     def compute_rewards(
