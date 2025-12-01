@@ -63,7 +63,9 @@ def iter_input_records(paths: Iterable[str]) -> Iterable[Dict[str, Any]]:
                     continue
 
 
-def extract_entries_from_record(rec: Dict[str, Any]) -> Iterable[tuple[str, str, Optional[str], bool, Dict[str, Any]]]:
+def extract_entries_from_record(
+    rec: Dict[str, Any],
+) -> Iterable[tuple[str, str, Optional[str], bool, Dict[str, Any]]]:
     """
     Normalize both flat and nested records into a list of tuples:
       (problem, solution, answer, verified, teacher_meta)
