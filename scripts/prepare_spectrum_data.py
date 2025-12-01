@@ -32,12 +32,12 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 if TYPE_CHECKING:
-    import sympy
     import openai as openai_module
+    import sympy
     import torch as torch_module
-    from transformers import Pipeline
     from sentence_transformers import SentenceTransformer as SentenceTransformerType
     from sentence_transformers import util as sbert_util_module
+    from transformers import Pipeline
 else:
     sympy = None
     openai_module = None
@@ -802,7 +802,9 @@ def main(
     for vt_domain, cats in domain_map.items():
         logging.info("Domain %s -> categories %s", vt_domain, cats)
 
-        def keep_fn(example: Dict[str, Any], cats: List[str] = cats, field: str = domain_field) -> bool:
+        def keep_fn(
+            example: Dict[str, Any], cats: List[str] = cats, field: str = domain_field
+        ) -> bool:
             val = example.get(field, "")
             if isinstance(val, list):
                 return any(c in val for c in cats)
