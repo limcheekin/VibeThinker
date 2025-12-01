@@ -26,10 +26,25 @@ import re
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from datasets import load_dataset
 from tqdm import tqdm
+
+if TYPE_CHECKING:
+    import sympy
+    import openai as openai_module
+    import torch as torch_module
+    from transformers import Pipeline
+    from sentence_transformers import SentenceTransformer as SentenceTransformerType
+    from sentence_transformers import util as sbert_util_module
+else:
+    sympy = None
+    openai_module = None
+    torch_module = None
+    Pipeline = None
+    SentenceTransformerType = None
+    sbert_util_module = None
 
 # Optional libs
 try:
@@ -40,22 +55,22 @@ except Exception:
 try:
     import openai
 except Exception:
-    openai = None
+    openai = None  # type: ignore[assignment]
 
 try:
     import torch
     from transformers import pipeline as hf_pipeline_constructor
 except Exception:
-    torch = None
-    hf_pipeline_constructor = None
+    torch = None  # type: ignore[assignment]
+    hf_pipeline_constructor = None  # type: ignore[assignment]
 
 # Semantic dedupe libs
 try:
     from sentence_transformers import SentenceTransformer
     from sentence_transformers import util as sbert_util
 except Exception:
-    SentenceTransformer = None
-    sbert_util = None
+    SentenceTransformer = None  # type: ignore[assignment,misc]
+    sbert_util = None  # type: ignore[assignment]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -113,7 +128,7 @@ def extract_boxed_answer(solution_text: str) -> Optional[str]:
     for pat in inline_patterns:
         matches = re.findall(pat, solution_text, flags=re.S)
         if matches:
-            candidate = matches[-1].strip()
+            candidate = str(matches[-1]).strip()
             if 0 < len(candidate) <= 200:
                 return candidate
 
@@ -131,7 +146,7 @@ def extract_boxed_answer(solution_text: str) -> Optional[str]:
         r"([0-9]+(?:\.[0-9]+)?|-?\d+\/\d+|[A-Za-z0-9\-\+\*/\^\(\)]+)", solution_text
     )
     if tokens:
-        cand = tokens[-1]
+        cand = str(tokens[-1])
         if len(cand) <= 64:
             return cand
 
@@ -174,7 +189,7 @@ def _latex_to_ascii(s: str) -> str:
     t = re.sub(r"\\\(|\\\)|\\\[|\\\]", "", t)
 
     # \frac{num}{den} -> (num)/(den) (handles nested braces greedily but not arbitrarily complex TeX)
-    def frac_repl(m):
+    def frac_repl(m: re.Match[str]) -> str:
         return f"({m.group(1)})/({m.group(2)})"
 
     t = re.sub(r"\\frac\s*\{\s*([^{}]+?)\s*\}\s*\{\s*([^{}]+?)\s*\}", frac_repl, t)
@@ -237,7 +252,7 @@ def _try_numeric_equal(a: str, b: str) -> Optional[bool]:
     if not a or not b:
         return None
 
-    def extract_number(text: str):
+    def extract_number(text: str) -> Optional[complex]:
         t = _latex_to_ascii(text)  # reuse latex -> ascii helper
         t = t.strip()
         # find first fraction token like -?num/den
@@ -277,7 +292,7 @@ def _try_numeric_equal(a: str, b: str) -> Optional[bool]:
     # compare by absolute difference for complex numbers
     diff = abs(na - nb)
     tol = max(_NUMERIC_TOL, 1e-6 * max(abs(na), abs(nb), 1.0))
-    return diff <= tol
+    return bool(diff <= tol)
 
 
 def verify_against_gold(
@@ -375,7 +390,7 @@ def call_teacher_openai(
         raise RuntimeError("openai package not installed")
     for attempt in range(5):
         try:
-            resp = openai.ChatCompletion.create(
+            resp = openai.ChatCompletion.create(  # type: ignore[attr-defined]
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
@@ -395,7 +410,7 @@ def call_teacher_openai(
     raise RuntimeError("OpenAI teacher failed after retries")
 
 
-def init_hf_pipeline(model_id: str):
+def init_hf_pipeline(model_id: str) -> Any:
     if hf_pipeline_constructor is None:
         raise RuntimeError("transformers pipeline not available")
     device = 0 if torch and torch.cuda.is_available() else -1
@@ -404,12 +419,12 @@ def init_hf_pipeline(model_id: str):
 
 
 def call_teacher_hf(
-    gen_pipeline_obj,
+    gen_pipeline_obj: Any,
     prompt: str,
     temperature: float = 1.0,
     top_p: float = 0.95,
     max_new_tokens: int = 1024,
-):
+) -> List[str]:
     for attempt in range(3):
         try:
             out = gen_pipeline_obj(
@@ -432,7 +447,7 @@ def call_teacher_hf(
 # ---------------------------
 # Semantic deduplication (SBERT)
 # ---------------------------
-def init_sbert(model_name: str = "all-MiniLM-L6-v2"):
+def init_sbert(model_name: str = "all-MiniLM-L6-v2") -> Any:
     if SentenceTransformer is None or sbert_util is None:
         raise RuntimeError(
             "sentence-transformers not installed. pip install sentence-transformers"
@@ -441,7 +456,7 @@ def init_sbert(model_name: str = "all-MiniLM-L6-v2"):
 
 
 def is_semantically_distinct(
-    candidate: str, accepted_texts: List[str], model, threshold: float = 0.90
+    candidate: str, accepted_texts: List[str], model: Any, threshold: float = 0.90
 ) -> bool:
     """
     Return True if candidate is semantically distinct from all accepted_texts.
@@ -465,11 +480,11 @@ def distill_multiple_solutions(
     teacher_backend: str,
     teacher_model: str,
     n_solutions_target: int = 3,
-    sampling_configs: Optional[List[Dict]] = None,
+    sampling_configs: Optional[List[Dict[str, Any]]] = None,
     verify: bool = True,
     max_attempts: int = 12,
-    hf_pipeline_obj=None,
-    sbert_model=None,
+    hf_pipeline_obj: Any = None,
+    sbert_model: Any = None,
     sim_threshold: float = 0.90,
     secondary_teacher_model: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
@@ -504,7 +519,7 @@ def distill_multiple_solutions(
     ]
 
     # helper to call primary teacher with a sampling cfg
-    def call_primary(prompt, cfg):
+    def call_primary(prompt: str, cfg: Dict[str, Any]) -> List[str]:
         if teacher_backend == "openai":
             return call_teacher_openai(
                 prompt,
@@ -522,7 +537,7 @@ def distill_multiple_solutions(
             )
 
     # helper to call secondary teacher or re-sample
-    def call_secondary(prompt):
+    def call_secondary(prompt: str) -> List[str]:
         if secondary_teacher_model:
             if teacher_backend == "openai":
                 return call_teacher_openai(
@@ -573,15 +588,15 @@ def distill_multiple_solutions(
                 if verify_against_gold(boxed, gold_solution):
                     verified = True
                     verify_info = {
-                        "method": "gold",
-                        "details": "exact_or_normalized_match",
+                        "method": "gold",  # type: ignore[dict-item]
+                        "details": "exact_or_normalized_match",  # type: ignore[dict-item]
                     }
             # 2) SymPy verification
             if not verified and verify and boxed:
                 sym = verify_answer_via_sympy(problem, txt_norm, boxed)
                 if sym.get("verified", False):
                     verified = True
-                    verify_info = {"method": "sympy", "details": sym.get("reason")}
+                    verify_info = {"method": "sympy", "details": sym.get("reason")}  # type: ignore[dict-item]
 
             # 3) consensus fallback: require agreement between two teacher draws (or secondary teacher)
             if not verified and verify:
@@ -605,8 +620,8 @@ def distill_multiple_solutions(
                 if boxed and boxed.strip() in sec_answers and boxed.strip() != "":
                     verified = True
                     verify_info = {
-                        "method": "consensus_secondary",
-                        "details": f"matched_secondary:{sec_answers}",
+                        "method": "consensus_secondary",  # type: ignore[dict-item]
+                        "details": f"matched_secondary:{sec_answers}",  # type: ignore[dict-item]
                     }
 
             # Semantic dedupe: ensure candidate is semantically distinct relative to already accepted solutions
@@ -714,7 +729,7 @@ def main(
     decontam_eval: Optional[List[str]] = None,
     resume: bool = True,
     checkpoint_interval: int = 20,
-):
+) -> None:
     random.seed(sample_seed)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -770,7 +785,7 @@ def main(
             sbert_model = None
 
     teacher_records_file = os.path.join(output_dir, "teacher_records.jsonl")
-    existing_teacher_map: Dict[str, List[Dict]] = {}
+    existing_teacher_map: Dict[str, List[Dict[str, Any]]] = {}
     if resume and os.path.exists(teacher_records_file):
         logging.info("Resuming from existing teacher_records: %s", teacher_records_file)
         with open(teacher_records_file, "r", encoding="utf-8") as f:
@@ -782,12 +797,12 @@ def main(
                 except Exception:
                     continue
 
-    overall_stats = defaultdict(int)
+    overall_stats: Dict[str, int] = defaultdict(int)
 
     for vt_domain, cats in domain_map.items():
         logging.info("Domain %s -> categories %s", vt_domain, cats)
 
-        def keep_fn(example, cats=cats, field=domain_field):
+        def keep_fn(example: Dict[str, Any], cats: List[str] = cats, field: str = domain_field) -> bool:
             val = example.get(field, "")
             if isinstance(val, list):
                 return any(c in val for c in cats)
@@ -902,8 +917,8 @@ def main(
                     f"spectrum_{vt_domain}_{'flat' if flatten else 'nested'}.jsonl",
                 )
                 with open(out_file, "w", encoding="utf-8") as f:
-                    for e in domain_out:
-                        f.write(json.dumps(e, ensure_ascii=False) + "\n")
+                    for entry in domain_out:
+                        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
                 logging.info(
                     "Checkpoint wrote %d domain entries to %s",
                     len(domain_out),
@@ -914,8 +929,8 @@ def main(
             output_dir, f"spectrum_{vt_domain}_{'flat' if flatten else 'nested'}.jsonl"
         )
         with open(out_file, "w", encoding="utf-8") as f:
-            for e in domain_out:
-                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+            for entry in domain_out:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         logging.info(
             "Completed domain %s: wrote %d entries to %s",
             vt_domain,
