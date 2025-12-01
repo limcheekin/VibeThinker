@@ -62,12 +62,45 @@ class MGPOLoss:
         old_log_probs: torch.Tensor,  # (B, G, Seq)
         advantages: torch.Tensor,  # (B, G)
         response_lengths: torch.Tensor,  # (B, G)
-    ) -> torch.Tensor:
-        """Compute clipped policy gradient loss."""
+        ref_log_probs: Optional[torch.Tensor] = None,  # (B, G, Seq)
+        kl_beta: float = 0.01,
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """Compute clipped policy gradient loss with optional KL penalty.
+        
+        Args:
+            log_probs: Log probabilities from current policy
+            old_log_probs: Log probabilities from old policy (for PPO ratio)
+            advantages: Computed advantages
+            response_lengths: Response lengths for normalization
+            ref_log_probs: Reference model log probabilities for KL penalty
+            kl_beta: KL penalty coefficient
+            
+        Returns:
+            Tuple of (loss, metrics_dict)
+        """
         # Sum log probs over the sequence dimension to get total log prob of completion
         # Assumes log_probs are already masked (0.0 for prompt/padding)
         log_prob_sum = log_probs.sum(dim=2)  # (B, G)
         old_log_prob_sum = old_log_probs.sum(dim=2)  # (B, G)
+
+        # Compute KL penalty if reference log probs provided
+        kl_penalty = torch.zeros_like(advantages)
+        metrics: Dict[str, float] = {}
+        
+        if ref_log_probs is not None:
+            # KL divergence: KL(π || π_ref) = log π - log π_ref
+            # Sum over tokens and normalize by length
+            safe_lengths = torch.clamp(response_lengths, min=1.0)
+            kl_per_token = log_probs - ref_log_probs
+            kl_penalty = kl_per_token.sum(dim=2) / safe_lengths  # (B, G)
+            
+            # Adjust advantages with KL penalty
+            advantages = advantages - kl_beta * kl_penalty
+            
+            # Track KL metrics
+            metrics["kl_mean"] = kl_penalty.mean().item()
+            metrics["kl_max"] = kl_penalty.max().item()
+            metrics["kl_min"] = kl_penalty.min().item()
 
         ratio = torch.exp(log_prob_sum - old_log_prob_sum)
         surr1 = ratio * advantages
@@ -80,7 +113,7 @@ class MGPOLoss:
         safe_lengths = torch.clamp(response_lengths, min=1.0)
         loss_matrix = loss_matrix / safe_lengths
 
-        return loss_matrix.mean()
+        return loss_matrix.mean(), metrics
 
 
 class MGPOTrainerWithEntropyWeighting:
@@ -95,6 +128,7 @@ class MGPOTrainerWithEntropyWeighting:
         config: Any,
         reward_calculator: Any,
         device: str = "cuda",
+        ref_model: Optional[Any] = None,
     ) -> None:
         self.model = model
         self.tokenizer = tokenizer
@@ -105,6 +139,28 @@ class MGPOTrainerWithEntropyWeighting:
         # Ensure tokenizer has pad token
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # Initialize reference model for KL penalty
+        if ref_model is None:
+            # Create a frozen copy of the model for KL divergence
+            # For models with LoRA/PEFT, we disable adapters to get base model behavior
+            from copy import deepcopy
+            
+            self.ref_model = deepcopy(model)
+            
+            # Disable LoRA adapters if using PEFT
+            if hasattr(self.ref_model, 'disable_adapter'):
+                self.ref_model.disable_adapter()
+        else:
+            self.ref_model = ref_model
+        
+        # Freeze reference model
+        self.ref_model.eval()
+        for param in self.ref_model.parameters():
+            param.requires_grad = False
+        
+        # KL penalty coefficient (from config or default)
+        self.kl_beta = getattr(config, 'kl_beta', 0.01)
 
         self.loss_fn = MGPOLoss(lambda_param=4.0, epsilon=0.2)
         self.optimizer = torch.optim.AdamW(
@@ -254,6 +310,44 @@ class MGPOTrainerWithEntropyWeighting:
 
         # 3. Compute Advantages
         advantages = self.loss_fn.compute_advantages(rewards, entropy_weights)
+        
+        # 3.5 Compute Reference Log Probs for KL Penalty
+        with torch.no_grad():
+            # Use reference model to compute log probs
+            # We need to process through the same pipeline
+            ref_inputs_texts = [p + c for p, group in zip(prompts, completions) for c in group]
+            max_len = getattr(self.config, "max_seq_length", 4096)
+            
+            ref_inputs = self.tokenizer(
+                ref_inputs_texts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_new_tokens=max_len,
+            ).to(self.device)
+            
+            ref_outputs = self.ref_model(**ref_inputs)
+            ref_log_probs_flat = self.compute_log_probabilities(ref_outputs, ref_inputs.input_ids)
+            
+            # Apply same masking as for old_log_probs
+            flat_prompts = [p for p, group in zip(prompts, completions) for _ in group]
+            prompt_inputs = self.tokenizer(
+                flat_prompts, return_tensors=None, padding=False, add_special_tokens=True
+            )
+            prompt_lengths = [len(ids) for ids in prompt_inputs["input_ids"]]
+            
+            mask = torch.ones_like(ref_log_probs_flat)
+            for i, p_len in enumerate(prompt_lengths):
+                safe_p_len = min(p_len, ref_log_probs_flat.shape[1])
+                mask[i, :safe_p_len] = 0.0
+            mask = mask * ref_inputs.attention_mask
+            ref_log_probs_flat = ref_log_probs_flat * mask
+            
+            # Reshape to (B, G, Seq)
+            B = len(prompts)
+            G = len(completions[0])
+            Seq = ref_log_probs_flat.shape[1]
+            ref_log_probs = ref_log_probs_flat.view(B, G, Seq)
 
         # 4. Compute New Log Probs (Current Policy) & Update
         self.model.train()
@@ -261,11 +355,13 @@ class MGPOTrainerWithEntropyWeighting:
             prompts, completions, is_training=True
         )
 
-        loss = self.loss_fn.compute_policy_loss(
+        loss, metrics = self.loss_fn.compute_policy_loss(
             new_log_probs,
             old_log_probs,
             advantages,
             response_lengths=response_lengths,
+            ref_log_probs=ref_log_probs,
+            kl_beta=self.kl_beta,
         )
 
         self.optimizer.zero_grad()
@@ -273,9 +369,14 @@ class MGPOTrainerWithEntropyWeighting:
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
         self.optimizer.step()
 
-        return {
+        result = {
             "loss": loss.item(),
             "reward_mean": rewards.mean().item(),
             "entropy_weight_mean": entropy_weights.mean().item(),
             "advantage_mean": advantages.mean().item(),
         }
+        
+        # Add KL metrics if available
+        result.update(metrics)
+        
+        return result

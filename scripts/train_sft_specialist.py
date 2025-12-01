@@ -45,6 +45,14 @@ def train_specialist(
         use_gradient_checkpointing="unsloth",  # optimize VRAM
         random_state=3407,
     )
+    
+    # Log model info for verification
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"  Total parameters: {total_params:,}")
+    print(f"  Trainable parameters (LoRA): {trainable_params:,}")
+    print(f"  Trainable %: {100 * trainable_params / total_params:.2f}%")
+    print(f"  Max sequence length: {max_seq_length}")
 
     # 3. Load Data
     dataset = load_dataset("json", data_files=data_path, split="train")

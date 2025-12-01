@@ -92,7 +92,7 @@ def test_compute_policy_loss(mgpo_loss):
     advantages = torch.randn(2, 4)
     response_lengths = torch.ones(2, 4) * 10
 
-    loss = mgpo_loss.compute_policy_loss(
+    loss, metrics = mgpo_loss.compute_policy_loss(
         log_probs, old_log_probs, advantages, response_lengths
     )
 
@@ -100,6 +100,7 @@ def test_compute_policy_loss(mgpo_loss):
     assert loss.ndim == 0  # Should be scalar
     assert not torch.isnan(loss)
     assert not torch.isinf(loss)
+    assert isinstance(metrics, dict)
 
 
 def test_compute_policy_loss_with_clipping():
@@ -112,11 +113,12 @@ def test_compute_policy_loss_with_clipping():
     advantages = torch.ones(1, 1)
     response_lengths = torch.ones(1, 1) * 5
 
-    loss = loss_fn.compute_policy_loss(
+    loss, metrics = loss_fn.compute_policy_loss(
         log_probs, old_log_probs, advantages, response_lengths
     )
 
     assert not torch.isnan(loss)
+    assert isinstance(metrics, dict)
 
 
 def test_mgpo_batch_data():
@@ -137,55 +139,72 @@ def test_mgpo_batch_data():
 def test_mgpo_trainer_init():
     """Test MGPOTrainer initialization."""
     mock_model = Mock()
+    mock_model.parameters = Mock(return_value=[])
+    
     mock_tokenizer = Mock()
     mock_config = Mock()
     mock_config.learning_rate = 1e-5
     mock_config.adam_beta1 = 0.9
     mock_config.adam_beta2 = 0.99
     mock_reward_calc = Mock()
+    
+    # Create a proper mock for ref_model
+    mock_ref_model = Mock()
+    mock_ref_model.parameters = Mock(return_value=[])
+    mock_ref_model.eval = Mock()
 
     with patch("vibethinker.grpo_custom.torch.optim.AdamW") as mock_optimizer:
-        trainer = MGPOTrainerWithEntropyWeighting(
-            model=mock_model,
-            tokenizer=mock_tokenizer,
-            config=mock_config,
-            reward_calculator=mock_reward_calc,
-            device="cuda",
-        )
+        with patch("copy.deepcopy", return_value=mock_ref_model):
+            trainer = MGPOTrainerWithEntropyWeighting(
+                model=mock_model,
+                tokenizer=mock_tokenizer,
+                config=mock_config,
+                reward_calculator=mock_reward_calc,
+                device="cuda",
+            )
 
-        assert trainer.model == mock_model
-        assert trainer.tokenizer == mock_tokenizer
-        assert trainer.device == "cuda"
-        assert mock_optimizer.called
+            assert trainer.model == mock_model
+            assert trainer.tokenizer == mock_tokenizer
+            assert trainer.device == "cuda"
+            assert mock_optimizer.called
+            assert trainer.ref_model is not None
 
 
 def test_mgpo_trainer_compute_log_probabilities():
     """Test log probability computation."""
     mock_model = Mock()
+    mock_model.parameters = Mock(return_value=[])
+    
     mock_tokenizer = Mock()
     mock_config = Mock()
     mock_config.learning_rate = 1e-5
     mock_config.adam_beta1 = 0.9
     mock_config.adam_beta2 = 0.99
     mock_reward_calc = Mock()
+    
+    # Create a proper mock for ref_model
+    mock_ref_model = Mock()
+    mock_ref_model.parameters = Mock(return_value=[])
+    mock_ref_model.eval = Mock()
 
     with patch("vibethinker.grpo_custom.torch.optim.AdamW"):
-        trainer = MGPOTrainerWithEntropyWeighting(
-            mock_model, mock_tokenizer, mock_config, mock_reward_calc
-        )
+        with patch("copy.deepcopy", return_value=mock_ref_model):
+            trainer = MGPOTrainerWithEntropyWeighting(
+                mock_model, mock_tokenizer, mock_config, mock_reward_calc
+            )
 
-        # Create mock model output
-        mock_output = Mock()
-        vocab_size = 1000
-        mock_output.logits = torch.randn(
-            2, 4, 10, vocab_size
-        )  # batch*G, seq_len, vocab
+            # Create mock model output
+            mock_output = Mock()
+            vocab_size = 1000
+            mock_output.logits = torch.randn(
+                2, 4, 10, vocab_size
+            )  # batch*G, seq_len, vocab
 
-        response_ids = torch.randint(0, vocab_size, (2, 4, 10))
+            response_ids = torch.randint(0, vocab_size, (2, 4, 10))
 
-        log_probs = trainer.compute_log_probabilities(mock_output, response_ids)
+            log_probs = trainer.compute_log_probabilities(mock_output, response_ids)
 
-        assert log_probs.shape == torch.Size([2, 4, 10])
+            assert log_probs.shape == torch.Size([2, 4, 10])
 
 
 def test_mgpo_trainer_training_step():
@@ -240,11 +259,12 @@ def test_different_epsilon_values():
         advantages = torch.randn(1, 2)
         response_lengths = torch.ones(1, 2) * 5
 
-        loss = loss_fn.compute_policy_loss(
+        loss, metrics = loss_fn.compute_policy_loss(
             log_probs, old_log_probs, advantages, response_lengths
         )
 
         assert not torch.isnan(loss)
+        assert isinstance(metrics, dict)
 
 
 def test_compute_advantages_large_batch():
@@ -269,9 +289,10 @@ def test_policy_loss_zero_length():
     response_lengths = torch.zeros(1, 1)  # Zero length
 
     # Should use max(length, 1) to avoid division by zero
-    loss = loss_fn.compute_policy_loss(
+    loss, metrics = loss_fn.compute_policy_loss(
         log_probs, old_log_probs, advantages, response_lengths
     )
 
     assert not torch.isnan(loss)
     assert not torch.isinf(loss)
+    assert isinstance(metrics, dict)
