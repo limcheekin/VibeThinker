@@ -141,8 +141,6 @@ def extract_boxed_answer(solution_text: str) -> Optional[str]:
 # ---------------------------
 # Verification helpers
 # ---------------------------
-import re
-from typing import Optional
 
 try:
     import sympy as sp
@@ -161,7 +159,7 @@ _NUMERIC_TOL = 1e-9
 
 
 def _latex_to_ascii(s: str) -> str:
-    """
+    r"""
     Best-effort convert a few LaTeX constructs to ascii math SymPy can parse.
     - \frac{a}{b} -> (a)/(b)
     - remove $ ... $ and \( \) \[ \] wrappers
@@ -730,9 +728,8 @@ def main(
 
     logging.info("Loading dataset: %s", hf_id)
     ds_train = load_dataset(hf_id, split="train")
-    ds_test = None
     try:
-        ds_test = load_dataset(hf_id, split="test")
+        load_dataset(hf_id, split="test")
     except Exception:
         logging.info("No explicit test split for dataset %s", hf_id)
 
