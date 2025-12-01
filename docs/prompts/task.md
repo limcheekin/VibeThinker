@@ -6,5 +6,5 @@ Please activate .venv and ensure the following commands executed successfully fo
 - pytest
 - black .
 - isort .
-- flake8 src
-- mypy src
+- flake8 src scripts
+- mypy src scripts
