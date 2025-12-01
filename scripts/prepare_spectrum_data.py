@@ -26,7 +26,7 @@ import re
 import sys
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from datasets import load_dataset
 from tqdm import tqdm

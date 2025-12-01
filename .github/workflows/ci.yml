@@ -23,7 +23,7 @@ jobs:
       run: |
         black --check .
         isort --check .
-        flake8 src
+        flake8 src scripts
 
   typecheck:
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
         pip install -e .[dev]
     - name: Run mypy
       run: |
-        mypy src
+        mypy src scripts
 
   test:
     runs-on: ubuntu-latest
