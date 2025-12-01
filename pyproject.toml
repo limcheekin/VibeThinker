@@ -19,6 +19,8 @@ dependencies = [
     "accelerate",
     "bitsandbytes",
     "scipy",
+    "openai",
+    "sentence-transformers"
 ]
 
 [project.optional-dependencies]
