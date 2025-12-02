@@ -45,7 +45,7 @@ def train_specialist(
         use_gradient_checkpointing="unsloth",  # optimize VRAM
         random_state=3407,
     )
-    
+
     # Log model info for verification
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

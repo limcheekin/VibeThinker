@@ -8,12 +8,10 @@ import argparse
 import glob
 import json
 import os
-from pathlib import Path
 from typing import List
 
 from vibethinker.diversity_probing import DiversityProber
 from vibethinker.model_fusion import fusion_weighted_average, load_expert_models
-
 
 # 4 Domains from the paper
 DOMAINS = ["algebra", "geometry", "calculus", "statistics"]
@@ -26,58 +24,61 @@ def get_best_checkpoint(
     """
     Select the intermediate checkpoint with highest Diversity (Pass@K).
     This implements the core SSP selection logic from the paper.
-    
+
     Args:
         domain: Domain name
         checkpoint_dir: Directory containing checkpoints
         data_path: Path to validation data
         k: K value for Pass@K metric
         num_gen: Number of generations per problem
-        
+
     Returns:
         Path to the best checkpoint
     """
     checkpoints = sorted(glob.glob(f"{checkpoint_dir}/checkpoint-*"))
-    
+
     if not checkpoints:
         raise ValueError(f"No checkpoints found in {checkpoint_dir}")
-    
+
     best_ckpt = None
     best_score = -1.0
-    
+
     # Load validation data (subset for efficiency)
-    with open(data_path, 'r') as f:
+    with open(data_path, "r") as f:
         probing_data = [json.loads(line) for line in f][:64]
-    
-    print(f"\n{'='*60}")
+
+    print(f"\n{'=' * 60}")
     print(f"Probing {len(checkpoints)} checkpoints for {domain}...")
-    print(f"{'='*60}")
-    
+    print(f"{'=' * 60}")
+
     for ckpt in checkpoints:
         print(f"\nEvaluating: {ckpt}")
-        
+
         # Load checkpoint and probe
         prober = DiversityProber(ckpt)
         metrics = prober.probe_domain(probing_data, k=k, num_generations=num_gen)
-        
+
         # SSP Metric: Diversity Score (Pass@K)
-        score = metrics['diversity_score']
+        score = metrics["diversity_score"]
         print(f"  Pass@{k} (Diversity): {score:.4f}")
         print(f"  Pass@1 (Accuracy):   {metrics['pass@1']:.4f}")
-        
+
         if score > best_score:
             best_score = score
             best_ckpt = ckpt
-            print(f"  ✓ New best checkpoint!")
-        
+            print("  ✓ New best checkpoint!")
+
         # Free memory
         del prober
-    
-    print(f"\n{'='*60}")
+
+    print(f"\n{'=' * 60}")
     print(f"Selected for {domain}: {best_ckpt}")
     print(f"Best Diversity Score: {best_score:.4f}")
-    print(f"{'='*60}\n")
-    
+    print(f"{'=' * 60}\n")
+
+    if best_ckpt is None:
+        raise ValueError(f"No valid checkpoints found for {domain}")
+
     return best_ckpt
 
 
@@ -90,16 +91,16 @@ def train_domain_specialist(
 ) -> str:
     """
     Train a specialist for one domain.
-    
+
     Returns:
         Path to checkpoint directory
     """
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Training Specialist: {domain}")
-    print(f"{'='*60}\n")
-    
+    print(f"{'=' * 60}\n")
+
     checkpoint_dir = f"{output_dir}/{domain}_specialist"
-    
+
     # Call training script
     cmd = (
         f"python scripts/train_sft_specialist.py "
@@ -109,13 +110,13 @@ def train_domain_specialist(
         f"--out {output_dir} "
         f"--max-steps {max_steps}"
     )
-    
+
     print(f"Running: {cmd}\n")
     exit_code = os.system(cmd)
-    
+
     if exit_code != 0:
         raise RuntimeError(f"Training failed for {domain} with exit code {exit_code}")
-    
+
     return checkpoint_dir
 
 
@@ -161,20 +162,20 @@ def main() -> int:
         action="store_true",
         help="Skip training phase (use existing checkpoints)",
     )
-    
+
     args = parser.parse_args()
-    
+
     selected_experts: List[str] = []
-    
+
     # Phase 1: Train Specialists
     for domain in DOMAINS:
         data_path = f"{args.data_dir}/{domain}.jsonl"
-        
+
         if not os.path.exists(data_path):
             print(f"WARNING: Data file not found: {data_path}")
             print(f"Skipping domain: {domain}")
             continue
-        
+
         if not args.skip_training:
             checkpoint_dir = train_domain_specialist(
                 domain=domain,
@@ -185,7 +186,7 @@ def main() -> int:
             )
         else:
             checkpoint_dir = f"{args.output_dir}/{domain}_specialist"
-        
+
         # Phase 2: Select Best Checkpoint via Diversity Probing
         try:
             best_ckpt = get_best_checkpoint(
@@ -200,35 +201,36 @@ def main() -> int:
             print(f"ERROR selecting checkpoint for {domain}: {e}")
             print(f"Skipping {domain}")
             continue
-    
+
     # Phase 3: Fuse Selected Experts
     if selected_experts:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Fusing {len(selected_experts)} Selected Experts")
-        print(f"{'='*60}\n")
-        
+        print(f"{'=' * 60}\n")
+
         for i, expert in enumerate(selected_experts):
-            print(f"  Expert {i+1}: {expert}")
-        
+            print(f"  Expert {i + 1}: {expert}")
+
         print("\nLoading experts...")
         experts = load_expert_models(selected_experts)
-        
+
         print("Performing weighted average fusion...")
         weights = [1.0 / len(experts)] * len(experts)
         fused_model = fusion_weighted_average(experts, weights=weights)
-        
+
         output_path = f"{args.output_dir}/vibethinker_spectrum_fused"
         print(f"\nSaving fused model to: {output_path}")
+        # Type assertion: fusion_weighted_average returns AutoModelForCausalLM
         fused_model.save_pretrained(output_path)
-        
-        print(f"\n{'='*60}")
-        print(f"✓ Spectrum Phase Complete!")
+
+        print(f"\n{'=' * 60}")
+        print("✓ Spectrum Phase Complete!")
         print(f"✓ Fused model saved to: {output_path}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
     else:
         print("\nERROR: No experts were trained/selected!")
         return 1
-    
+
     return 0
 
 

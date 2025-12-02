@@ -140,14 +140,14 @@ def test_mgpo_trainer_init():
     """Test MGPOTrainer initialization."""
     mock_model = Mock()
     mock_model.parameters = Mock(return_value=[])
-    
+
     mock_tokenizer = Mock()
     mock_config = Mock()
     mock_config.learning_rate = 1e-5
     mock_config.adam_beta1 = 0.9
     mock_config.adam_beta2 = 0.99
     mock_reward_calc = Mock()
-    
+
     # Create a proper mock for ref_model
     mock_ref_model = Mock()
     mock_ref_model.parameters = Mock(return_value=[])
@@ -174,14 +174,14 @@ def test_mgpo_trainer_compute_log_probabilities():
     """Test log probability computation."""
     mock_model = Mock()
     mock_model.parameters = Mock(return_value=[])
-    
+
     mock_tokenizer = Mock()
     mock_config = Mock()
     mock_config.learning_rate = 1e-5
     mock_config.adam_beta1 = 0.9
     mock_config.adam_beta2 = 0.99
     mock_reward_calc = Mock()
-    
+
     # Create a proper mock for ref_model
     mock_ref_model = Mock()
     mock_ref_model.parameters = Mock(return_value=[])

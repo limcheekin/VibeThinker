@@ -60,6 +60,12 @@ class TestTrainSpecialist:
         mock_flm.from_pretrained.return_value = (mock_model, mock_tokenizer)
         mock_flm.get_peft_model.return_value = mock_model
 
+        # Mock parameters for iteration
+        param_mock = Mock()
+        param_mock.numel.return_value = 1000
+        param_mock.requires_grad = True
+        mock_model.parameters.return_value = [param_mock]
+
         # Mock dataset
         mock_dataset = Mock()
         mock_load_dataset.return_value = mock_dataset
@@ -130,6 +136,12 @@ class TestTrainSpecialist:
         mock_tokenizer.eos_token = "</s>"
         mock_flm.from_pretrained.return_value = (mock_model, mock_tokenizer)
         mock_flm.get_peft_model.return_value = mock_model
+
+        # Mock parameters for iteration
+        param_mock = Mock()
+        param_mock.numel.return_value = 1000
+        param_mock.requires_grad = True
+        mock_model.parameters.return_value = [param_mock]
         mock_load_dataset.return_value = Mock()
         mock_sft_config.return_value = Mock()
         mock_trainer.return_value = Mock()
@@ -170,6 +182,12 @@ class TestTrainSpecialist:
         mock_tokenizer.eos_token = "</s>"
         mock_flm.from_pretrained.return_value = (mock_model, mock_tokenizer)
         mock_flm.get_peft_model.return_value = mock_model
+
+        # Mock parameters for iteration
+        param_mock = Mock()
+        param_mock.numel.return_value = 1000
+        param_mock.requires_grad = True
+        mock_model.parameters.return_value = [param_mock]
         mock_load_dataset.return_value = Mock()
         mock_sft_config.return_value = Mock()
         mock_trainer.return_value = Mock()
@@ -215,6 +233,12 @@ class TestTrainSpecialist:
         mock_tokenizer.eos_token = "</s>"
         mock_flm.from_pretrained.return_value = (mock_model, mock_tokenizer)
         mock_flm.get_peft_model.return_value = mock_model
+
+        # Mock parameters for iteration
+        param_mock = Mock()
+        param_mock.numel.return_value = 1000
+        param_mock.requires_grad = True
+        mock_model.parameters.return_value = [param_mock]
         mock_load_dataset.return_value = Mock()
         mock_sft_config.return_value = Mock()
         mock_trainer.return_value = Mock()
@@ -315,6 +339,12 @@ class TestLoRAConfiguration:
         mock_tokenizer.eos_token = "</s>"
         mock_flm.from_pretrained.return_value = (mock_model, mock_tokenizer)
         mock_flm.get_peft_model.return_value = mock_model
+
+        # Mock parameters for iteration
+        param_mock = Mock()
+        param_mock.numel.return_value = 1000
+        param_mock.requires_grad = True
+        mock_model.parameters.return_value = [param_mock]
         mock_load_dataset.return_value = Mock()
         mock_sft_config.return_value = Mock()
         mock_trainer.return_value = Mock()

@@ -408,53 +408,52 @@ class MGPORewardCalculator:
         return batch_rewards, batch_entropy_info
 
 
-
 # Safe builtins for code execution - removes dangerous operations
 SAFE_BUILTINS = {
-    'abs': abs,
-    'all': all,
-    'any': any,
-    'bool': bool,
-    'dict': dict,
-    'enumerate': enumerate,
-    'float': float,
-    'int': int,
-    'len': len,
-    'list': list,
-    'max': max,
-    'min': min,
-    'pow': pow,
-    'range': range,
-    'round': round,
-    'set': set,
-    'sorted': sorted,
-    'str': str,
-    'sum': sum,
-    'tuple': tuple,
-    'zip': zip,
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "enumerate": enumerate,
+    "float": float,
+    "int": int,
+    "len": len,
+    "list": list,
+    "max": max,
+    "min": min,
+    "pow": pow,
+    "range": range,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "zip": zip,
     # Note: Deliberately excluding: open, input, compile, eval, exec, __import__
 }
 
 # Whitelist of safe modules that can be used in code execution
-SAFE_MODULES = {'math', 'numpy'}
+SAFE_MODULES = {"math", "numpy"}
 
 
 def _create_safe_globals() -> Dict[str, Any]:
     """
     Create restricted globals for code execution.
-    
+
     Returns:
         Dictionary with safe builtins and allowed module imports
     """
-    safe_globals: Dict[str, Any] = {'__builtins__': SAFE_BUILTINS}
-    
+    safe_globals: Dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
+
     # Allow safe module imports
     for module_name in SAFE_MODULES:
         try:
             safe_globals[module_name] = __import__(module_name)
         except ImportError:
             pass  # Module not available, skip
-    
+
     return safe_globals
 
 
@@ -465,7 +464,7 @@ def _unsafe_code_execution_worker(
 ) -> None:
     """
     Worker function for code execution with restricted environment.
-    
+
     Note: Despite the name, this is safer than raw exec() due to:
     - Restricted builtins (no file I/O, no imports, etc.)
     - Multiprocessing isolation
@@ -475,10 +474,10 @@ def _unsafe_code_execution_worker(
         # Use safe globals with restricted builtins
         safe_globals = _create_safe_globals()
         local_env: Dict[str, Any] = {}
-        
+
         # Execute in restricted environment
         exec(generated_code, safe_globals, local_env)
-        
+
         # Heuristic: find last defined function
         func_names = [k for k in local_env if callable(local_env[k])]
         if not func_names:

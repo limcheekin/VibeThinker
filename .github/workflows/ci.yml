@@ -39,7 +39,8 @@ jobs:
         pip install -e .[dev]
     - name: Run mypy
       run: |
-        mypy src scripts
+        mypy src
+        mypy scripts
 
   test:
     runs-on: ubuntu-latest
