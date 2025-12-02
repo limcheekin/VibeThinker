@@ -30,6 +30,7 @@ def train_signal_phase_complete(
     output_dir: str = "outputs/vibethinker_complete",
     gpu_type: str = "H100",
     max_steps: int = 2000,
+    max_seq_length: int = 4096,
 ) -> Tuple[str, Any, Any]:
     """
     Complete training with all debugging, visualization, and cost tracking.
@@ -48,7 +49,7 @@ def train_signal_phase_complete(
     # 1. Load Base Model in 4-bit
     model, _ = FastLanguageModel.from_pretrained(
         spectrum_model_path,
-        max_seq_length=4096,
+        max_seq_length=max_seq_length,
         load_in_4bit=True,
     )
 
@@ -286,14 +287,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--gpu-type", type=str, default="H100")
     parser.add_argument("--max-steps", type=int, default=2000)
+    parser.add_argument("--max-seq-length", type=int, default=4096)
+    parser.add_argument("--train-data", type=str, default="data/algebra_train.jsonl")
+    parser.add_argument("--val-data", type=str, default="data/algebra_val.jsonl")
     args = parser.parse_args()
 
-    train_dataset = load_dataset(
-        "json", data_files="data/algebra_train.jsonl", split="train"
-    )
-    val_dataset = load_dataset(
-        "json", data_files="data/algebra_val.jsonl", split="train"
-    )
+    train_dataset = load_dataset("json", data_files=args.train_data, split="train")
+    val_dataset = load_dataset("json", data_files=args.val_data, split="train")
     tokenizer = AutoTokenizer.from_pretrained(args.spectrum_path)  # type: ignore[no-untyped-call]
 
     train_signal_phase_complete(
@@ -304,4 +304,5 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         gpu_type=args.gpu_type,
         max_steps=args.max_steps,
+        max_seq_length=args.max_seq_length,
     )
