@@ -47,8 +47,8 @@ This project uses `black`, `isort`, and `flake8` for linting and code formatting
 
 ## Running the Project
 
-The main entry point for the project is `src/vibethinker/train_complete.py`. To run the full training pipeline:
+The main entry point for the project is `pipeline.sh`. To run the full training pipeline:
 
 ```bash
-python src/vibethinker/train_complete.py
+./pipeline.sh
 ```
