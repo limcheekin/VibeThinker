@@ -1,5 +1,7 @@
 # VibeThinker
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/limcheekin/VibeThinker)
+
 The objective of this project is to reproduce the methodology (SSP, MGPO) from the paper on a smaller scale using the `unsloth/Qwen3-0.6B-Base-unsloth-bnb-4bit` model, to see how it compares to the results of the paper’s 1.5B model.
 
 ## Development Setup
