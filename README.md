@@ -1,13 +1,13 @@
 # VibeThinker
 
-This repository contains the implementation of the VibeThinker project, a production-quality Python project based on the specifications in `docs/implementation_guide.md`.
+The objective of this project is to reproduce the methodology (SSP, MGPO) from the paper on a smaller scale using the `unsloth/Qwen3-0.6B-Base-unsloth-bnb-4bit` model, to see how it compares to the results of the paper’s 1.5B model.
 
 ## Development Setup
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
-    cd <repository-name>
+    git clone https://github.com/limcheekin/VibeThinker.git
+    cd VibeThinker
     ```
 
 2.  **Install dependencies:**
