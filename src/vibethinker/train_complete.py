@@ -18,8 +18,41 @@ from unsloth import FastLanguageModel
 from vibethinker.cost_analysis import CostAnalyzer
 from vibethinker.debugger import PerformanceInspector, TrainingDebugger
 from vibethinker.grpo_custom import MGPOTrainerWithEntropyWeighting
-from vibethinker.monitor import MGPORewardCalculator, TrainingMonitor
+from vibethinker.monitor import (
+    CodeRewardCalculator,
+    MGPORewardCalculator,
+    TrainingMonitor,
+)
 from vibethinker.visualization import GenerationAnalyzer
+
+
+def validate_dataset_format(dataset: Any, reward_type: str) -> None:
+    """Validate dataset has required fields for reward type.
+
+    Args:
+        dataset: Dataset to validate
+        reward_type: Type of reward calculator ("math" or "code")
+
+    Raises:
+        ValueError: If dataset is missing required fields
+    """
+    if len(dataset) == 0:
+        raise ValueError("Dataset is empty")
+
+    sample = dataset[0]
+    if reward_type == "math":
+        if "answer" not in sample:
+            raise ValueError(
+                f"Math dataset must have 'answer' field. Found: {list(sample.keys())}"
+            )
+    elif reward_type == "code":
+        if "test_cases" not in sample and "tests" not in sample:
+            raise ValueError(
+                f"Code dataset must have 'test_cases' or 'tests' field. "
+                f"Found: {list(sample.keys())}"
+            )
+    else:
+        raise ValueError(f"Unknown reward_type: {reward_type}")
 
 
 def train_signal_phase_complete(
@@ -31,6 +64,9 @@ def train_signal_phase_complete(
     gpu_type: str = "H100",
     max_steps: int = 2000,
     max_seq_length: int = 4096,
+    reward_type: str = "math",
+    test_field: str = "test_cases",
+    gradient_accumulation_steps: int = 1,
 ) -> Tuple[str, Any, Any]:
     """
     Complete training with all debugging, visualization, and cost tracking.
@@ -95,8 +131,14 @@ def train_signal_phase_complete(
     throughput = inspector.benchmark_throughput(model, tokenizer)
     print(f"Throughput: {throughput['throughput_tokens_per_sec']:.0f} tokens/sec")
 
+    # Validate dataset format
+    validate_dataset_format(train_dataset, reward_type)
+    validate_dataset_format(val_dataset, reward_type)
+
     class TrainingConfig:
-        def __init__(self, max_steps: int) -> None:
+        def __init__(
+            self, max_steps: int, gradient_accumulation_steps: int = 1
+        ) -> None:
             self.learning_rate: float = 5e-6
             self.adam_beta1: float = 0.9
             self.adam_beta2: float = 0.99
@@ -104,11 +146,22 @@ def train_signal_phase_complete(
             self.max_steps: int = max_steps
             self.eval_every: int = 200
             self.log_every: int = 10
+            self.gradient_accumulation_steps: int = gradient_accumulation_steps
+            self.max_seq_length: int = max_seq_length
 
-    config = TrainingConfig(max_steps)
+    config = TrainingConfig(max_steps, gradient_accumulation_steps)
 
     print("\nInitializing MGPO trainer...")
-    reward_calc = MGPORewardCalculator(lambda_param=4.0)
+    # Select reward calculator based on reward_type
+    if reward_type == "math":
+        reward_calc: Any = MGPORewardCalculator(lambda_param=4.0)
+    elif reward_type == "code":
+        reward_calc = CodeRewardCalculator(timeout=2.0)
+    else:
+        raise ValueError(f"Unknown reward_type: {reward_type}")
+
+    print(f"Using {reward_calc.__class__.__name__} for {reward_type} RL training")
+
     trainer = MGPOTrainerWithEntropyWeighting(
         model=model,
         tokenizer=tokenizer,
@@ -142,7 +195,27 @@ def train_signal_phase_complete(
             try:
                 # --- ACTOR PHASE: Generate Completions ---
                 prompts = batch["problem"]
-                reference_answers = batch["answer"]
+
+                # Extract reward targets based on reward_type
+                if reward_type == "math":
+                    reference_answers = batch["answer"]
+                    test_suites = None
+                elif reward_type == "code":
+                    # Try common field names for test cases
+                    if test_field in batch:
+                        test_suites = batch[test_field]
+                    elif "test_cases" in batch:
+                        test_suites = batch["test_cases"]
+                    elif "tests" in batch:
+                        test_suites = batch["tests"]
+                    else:
+                        raise ValueError(
+                            f"Test cases field not found. Tried: {test_field}, "
+                            "test_cases, tests"
+                        )
+                    reference_answers = None
+                else:
+                    raise ValueError(f"Unknown reward_type: {reward_type}")
 
                 G = 4  # Number of generations per prompt for GRPO
                 all_completions = []
@@ -186,11 +259,15 @@ def train_signal_phase_complete(
                 # Switch back to train mode (enables LoRA gradients)
                 model.train()
 
+                # Build batch dict with appropriate fields for reward calculator
                 batch_dict = {
                     "prompts": prompts,
                     "completions": all_completions,
-                    "reference_answers": reference_answers,
                 }
+                if reward_type == "math":
+                    batch_dict["reference_answers"] = reference_answers
+                elif reward_type == "code":
+                    batch_dict["test_suites"] = test_suites
 
                 metrics = trainer.training_step(batch_dict)
 
@@ -290,6 +367,25 @@ if __name__ == "__main__":
     parser.add_argument("--max-seq-length", type=int, default=4096)
     parser.add_argument("--train-data", type=str, default="data/algebra_train.jsonl")
     parser.add_argument("--val-data", type=str, default="data/algebra_val.jsonl")
+    parser.add_argument(
+        "--reward-type",
+        type=str,
+        choices=["math", "code"],
+        default="math",
+        help="Type of RL training: 'math' for answer matching, 'code' for test execution",
+    )
+    parser.add_argument(
+        "--test-field",
+        type=str,
+        default="test_cases",
+        help="Field name for test cases in code datasets",
+    )
+    parser.add_argument(
+        "--gradient-accumulation-steps",
+        type=int,
+        default=1,
+        help="Number of gradient accumulation steps for larger effective batch size",
+    )
     args = parser.parse_args()
 
     train_dataset = load_dataset("json", data_files=args.train_data, split="train")
@@ -305,4 +401,7 @@ if __name__ == "__main__":
         gpu_type=args.gpu_type,
         max_steps=args.max_steps,
         max_seq_length=args.max_seq_length,
+        reward_type=args.reward_type,
+        test_field=args.test_field,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
     )

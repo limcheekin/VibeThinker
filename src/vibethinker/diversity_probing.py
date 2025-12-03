@@ -126,6 +126,37 @@ class DiversityProber:
             "diversity_score": avg_pass_at_k,  # This is the selection metric
         }
 
+    def unload_model(self) -> None:
+        """Explicitly unload model from GPU to free VRAM.
+
+        Critical for multi-domain iteration to prevent OOM crashes.
+        """
+        import gc
+
+        import torch
+
+        # Move model to CPU first
+        if hasattr(self, "model") and hasattr(self.model, "cpu"):
+            self.model.cpu()
+
+        # Delete model references
+        if hasattr(self, "model"):
+            del self.model
+        if hasattr(self, "tokenizer"):
+            del self.tokenizer
+
+        # Force garbage collection
+        gc.collect()
+
+        # Clear CUDA cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    def __del__(self) -> None:
+        """Cleanup on deletion."""
+        if hasattr(self, "model"):
+            self.unload_model()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

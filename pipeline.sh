@@ -23,6 +23,10 @@ DATA_PREP_MAX_PROBLEMS="${DATA_PREP_MAX_PROBLEMS:-500}"
 DATA_PREP_N_SOLUTIONS="${DATA_PREP_N_SOLUTIONS:-3}"
 DATA_PREP_TEACHER_MODEL="${DATA_PREP_TEACHER_MODEL:-meta-llama/Llama-3.2-3B-Instruct}"
 
+# Decontamination settings (10-gram matching to prevent eval contamination)
+DECONTAM_ENABLED="${DECONTAM_ENABLED:-true}"
+DECONTAM_EVAL_DATASETS="${DECONTAM_EVAL_DATASETS:-GSM8K MATH}"
+
 mkdir -p "$OUTPUT_ROOT"
 
 # ==============================================================================
@@ -71,6 +75,16 @@ done
 
 if [ "$MISSING_FILES" = true ]; then
     echo "Missing domain data files. Running data preparation..."
+    
+    # Build decontamination arguments if enabled
+    if [ "$DECONTAM_ENABLED" = true ]; then
+        echo "Decontamination ENABLED (10-gram matching against: $DECONTAM_EVAL_DATASETS)"
+        DECONTAM_ARGS="--decontam-eval $DECONTAM_EVAL_DATASETS"
+    else
+        echo "Decontamination DISABLED"
+        DECONTAM_ARGS=""
+    fi
+    
     python scripts/prepare_spectrum_data.py \
         --hf-id "lighteval/MATH" \
         --output-dir "$DATA_DIR" \
@@ -78,7 +92,8 @@ if [ "$MISSING_FILES" = true ]; then
         --teacher-model "$DATA_PREP_TEACHER_MODEL" \
         --n-solutions "$DATA_PREP_N_SOLUTIONS" \
         --verify \
-        --max-problems "$DATA_PREP_MAX_PROBLEMS"
+        --max-problems "$DATA_PREP_MAX_PROBLEMS" \
+        $DECONTAM_ARGS
     
     if [ $? -ne 0 ]; then
         echo "Error: Data preparation failed!"

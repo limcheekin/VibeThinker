@@ -142,25 +142,42 @@ class MGPOTrainerWithEntropyWeighting:
 
         # Initialize reference model for KL penalty
         if ref_model is None:
-            # Create a frozen copy of the model for KL divergence
-            # For models with LoRA/PEFT, we disable adapters to get base model behavior
-            from copy import deepcopy
+            # CRITICAL: Do NOT deepcopy quantized models - this fails with 4-bit models
+            # Instead, reload the base model from disk in frozen state
+            from unsloth import FastLanguageModel
 
-            self.ref_model = deepcopy(model)
+            # Get the base model path from the current model's config
+            model_name = model.config._name_or_path
 
-            # Disable LoRA adapters if using PEFT
-            if hasattr(self.ref_model, "disable_adapter"):
-                self.ref_model.disable_adapter()
+            print(f"Loading reference model from {model_name}...")
+            self.ref_model, _ = FastLanguageModel.from_pretrained(
+                model_name,
+                max_seq_length=getattr(config, "max_seq_length", 4096),
+                load_in_4bit=True,
+            )
+
+            # Do NOT apply LoRA adapters to reference model
+            # It should remain frozen at base model weights
+            print("Reference model loaded (no LoRA adapters)")
         else:
             self.ref_model = ref_model
 
-        # Freeze reference model
+        # Freeze reference model and optimize memory
         self.ref_model.eval()
         for param in self.ref_model.parameters():
             param.requires_grad = False
 
+        # Clear CUDA cache to optimize memory
+        torch.cuda.empty_cache()
+
         # KL penalty coefficient (from config or default)
         self.kl_beta = getattr(config, "kl_beta", 0.01)
+
+        # Gradient accumulation state
+        self.gradient_accumulation_steps = getattr(
+            config, "gradient_accumulation_steps", 1
+        )
+        self._accumulation_counter = 0
 
         self.loss_fn = MGPOLoss(lambda_param=4.0, epsilon=0.2)
         self.optimizer = torch.optim.AdamW(
@@ -281,6 +298,14 @@ class MGPOTrainerWithEntropyWeighting:
 
         return log_probs, response_lens
 
+    def should_update_weights(self) -> bool:
+        """Check if we should update weights based on accumulation counter.
+
+        Returns:
+            True if current step completes an accumulation cycle
+        """
+        return (self._accumulation_counter + 1) % self.gradient_accumulation_steps == 0
+
     def training_step(self, batch: Dict[str, Any]) -> Dict[str, float]:
         """
         Execute one training step with MGPO.
@@ -371,10 +396,22 @@ class MGPOTrainerWithEntropyWeighting:
             kl_beta=self.kl_beta,
         )
 
-        self.optimizer.zero_grad()
-        loss.backward()  # type: ignore[no-untyped-call]
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-        self.optimizer.step()
+        # Scale loss for gradient accumulation
+        scaled_loss = loss / self.gradient_accumulation_steps
+
+        # Zero gradients only at start of accumulation cycle
+        if self._accumulation_counter % self.gradient_accumulation_steps == 0:
+            self.optimizer.zero_grad()
+
+        scaled_loss.backward()  # type: ignore[no-untyped-call]
+
+        # Only update weights after accumulation steps complete
+        if self.should_update_weights():
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+            self.optimizer.step()
+
+        # Increment accumulation counter
+        self._accumulation_counter += 1
 
         result = {
             "loss": loss.item(),

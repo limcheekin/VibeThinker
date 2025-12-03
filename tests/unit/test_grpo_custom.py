@@ -148,26 +148,26 @@ def test_mgpo_trainer_init():
     mock_config.adam_beta2 = 0.99
     mock_reward_calc = Mock()
 
-    # Create a proper mock for ref_model
     mock_ref_model = Mock()
     mock_ref_model.parameters = Mock(return_value=[])
     mock_ref_model.eval = Mock()
 
     with patch("vibethinker.grpo_custom.torch.optim.AdamW") as mock_optimizer:
-        with patch("copy.deepcopy", return_value=mock_ref_model):
-            trainer = MGPOTrainerWithEntropyWeighting(
-                model=mock_model,
-                tokenizer=mock_tokenizer,
-                config=mock_config,
-                reward_calculator=mock_reward_calc,
-                device="cuda",
-            )
+        # Pass ref_model to avoid FastLanguageModel.from_pretrained call in tests
+        trainer = MGPOTrainerWithEntropyWeighting(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+            config=mock_config,
+            reward_calculator=mock_reward_calc,
+            device="cuda",
+            ref_model=mock_ref_model,  # Provide ref_model to skip auto-creation
+        )
 
-            assert trainer.model == mock_model
-            assert trainer.tokenizer == mock_tokenizer
-            assert trainer.device == "cuda"
-            assert mock_optimizer.called
-            assert trainer.ref_model is not None
+        assert trainer.model == mock_model
+        assert trainer.tokenizer == mock_tokenizer
+        assert trainer.device == "cuda"
+        assert mock_optimizer.called
+        assert trainer.ref_model is not None
 
 
 def test_mgpo_trainer_compute_log_probabilities():
@@ -182,29 +182,32 @@ def test_mgpo_trainer_compute_log_probabilities():
     mock_config.adam_beta2 = 0.99
     mock_reward_calc = Mock()
 
-    # Create a proper mock for ref_model
     mock_ref_model = Mock()
     mock_ref_model.parameters = Mock(return_value=[])
     mock_ref_model.eval = Mock()
 
     with patch("vibethinker.grpo_custom.torch.optim.AdamW"):
-        with patch("copy.deepcopy", return_value=mock_ref_model):
-            trainer = MGPOTrainerWithEntropyWeighting(
-                mock_model, mock_tokenizer, mock_config, mock_reward_calc
-            )
+        # Pass ref_model to avoid FastLanguageModel.from_pretrained call in tests
+        trainer = MGPOTrainerWithEntropyWeighting(
+            mock_model,
+            mock_tokenizer,
+            mock_config,
+            mock_reward_calc,
+            ref_model=mock_ref_model,  # Provide ref_model to skip auto-creation
+        )
 
-            # Create mock model output
-            mock_output = Mock()
-            vocab_size = 1000
-            mock_output.logits = torch.randn(
-                2, 4, 10, vocab_size
-            )  # batch*G, seq_len, vocab
+        # Create mock model output
+        mock_output = Mock()
+        vocab_size = 1000
+        mock_output.logits = torch.randn(
+            2, 4, 10, vocab_size
+        )  # batch*G, seq_len, vocab
 
-            response_ids = torch.randint(0, vocab_size, (2, 4, 10))
+        response_ids = torch.randint(0, vocab_size, (2, 4, 10))
 
-            log_probs = trainer.compute_log_probabilities(mock_output, response_ids)
+        log_probs = trainer.compute_log_probabilities(mock_output, response_ids)
 
-            assert log_probs.shape == torch.Size([2, 4, 10])
+        assert log_probs.shape == torch.Size([2, 4, 10])
 
 
 def test_mgpo_trainer_training_step():
@@ -230,9 +233,19 @@ def test_mgpo_trainer_training_step():
         )
     )
 
+    mock_ref_model = Mock()
+    mock_ref_model.parameters = Mock(return_value=[])
+    mock_ref_model.eval = Mock()
+
     with patch("vibethinker.grpo_custom.torch.optim.AdamW"):
+        # Pass ref_model to avoid FastLanguageModel.from_pretrained call in tests
         trainer = MGPOTrainerWithEntropyWeighting(
-            mock_model, mock_tokenizer, mock_config, mock_reward_calc, device="cpu"
+            mock_model,
+            mock_tokenizer,
+            mock_config,
+            mock_reward_calc,
+            device="cpu",
+            ref_model=mock_ref_model,  # Provide ref_model to skip auto-creation
         )
 
         # Verify trainer was created

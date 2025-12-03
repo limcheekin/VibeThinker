@@ -68,8 +68,16 @@ def get_best_checkpoint(
             best_ckpt = ckpt
             print("  ✓ New best checkpoint!")
 
-        # Free memory
+        # Free memory - CRITICAL for multi-domain iteration
+        prober.unload_model()  # Unload model before deleting prober
         del prober
+
+        # Clear CUDA cache to fully free VRAM
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
     print(f"\n{'=' * 60}")
     print(f"Selected for {domain}: {best_ckpt}")
