@@ -60,6 +60,7 @@ class DiversityProber:
         problems: List[Dict[str, Any]],
         k: int = 8,
         num_generations: int = 16,
+        domain: str = "math",
     ) -> Dict[str, float]:
         """
         Evaluate the model on a domain-specific dataset using Pass@K.
@@ -78,10 +79,17 @@ class DiversityProber:
         total_pass_at_1 = 0.0
 
         for item in tqdm(problems, desc="Probing"):
-            prompt_text = (
-                f"Solve the following problem step by step:\n\n"
-                f"{item['problem']}\n\nSolution:"
-            )
+            # Domain-aware prompt construction
+            if domain == "code":
+                prompt_text = (
+                    f"Write a Python function to solve:\n\n"
+                    f"{item['problem']}\n\n```python\n"
+                )
+            else:
+                prompt_text = (
+                    f"Solve the following problem step by step:\n\n"
+                    f"{item['problem']}\n\nSolution:"
+                )
             inputs = self.tokenizer([prompt_text], return_tensors="pt").to("cuda")
 
             # Generate N solutions (spectrum)

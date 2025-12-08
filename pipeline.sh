@@ -63,6 +63,7 @@ REQUIRED_FILES=(
     "$DATA_DIR/geometry_train.jsonl"
     "$DATA_DIR/calculus_train.jsonl"
     "$DATA_DIR/statistics_train.jsonl"
+    "$DATA_DIR/apps_train.jsonl"
 )
 
 MISSING_FILES=false
@@ -169,15 +170,13 @@ echo ""
 echo ">>> [Phase 2.3] Signal RL - Code Domain"
 FINAL_OUT="$OUTPUT_ROOT/phase2_stage3_code"
 
-# Note: This stage requires livecodebench data files
-# If not available, it will fall back to algebra data
-CODE_TRAIN_DATA="$DATA_DIR/livecodebench_train.jsonl"
-CODE_VAL_DATA="$DATA_DIR/livecodebench_val.jsonl"
+# Code RL with APPS dataset
+CODE_TRAIN_DATA="$DATA_DIR/apps_train.jsonl"
+CODE_VAL_DATA="$DATA_DIR/apps_val.jsonl"
 
 if [ ! -f "$CODE_TRAIN_DATA" ]; then
-    echo "Warning: $CODE_TRAIN_DATA not found. Using algebra data as fallback."
-    CODE_TRAIN_DATA="$DATA_DIR/algebra_train.jsonl"
-    CODE_VAL_DATA="$DATA_DIR/algebra_val.jsonl"
+    echo "Error: $CODE_TRAIN_DATA not found. Please run scripts/prepare_apps_data.py first."
+    exit 1
 fi
 
 python "$TRAIN_SCRIPT" \
@@ -186,7 +185,9 @@ python "$TRAIN_SCRIPT" \
     --gpu-type "H100" \
     --max-steps "$SIGNAL_STEPS" \
     --train-data "$CODE_TRAIN_DATA" \
-    --val-data "$CODE_VAL_DATA"
+    --val-data "$CODE_VAL_DATA" \
+    --reward-type "code" \
+    --test-field "test_cases"
 
 validate_checkpoint "$FINAL_OUT/final" "Final Model"
 

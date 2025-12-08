@@ -232,7 +232,7 @@ def test_domains_constant(mock_gpu_dependencies):
 
     from train_spectrum_phase import BASE_MODEL, DOMAINS
 
-    assert DOMAINS == ["algebra", "geometry", "calculus", "statistics"]
+    assert DOMAINS == ["algebra", "geometry", "calculus", "statistics", "code"]
     assert "Qwen" in BASE_MODEL
 
 

@@ -13,8 +13,8 @@ from typing import List
 from vibethinker.diversity_probing import DiversityProber
 from vibethinker.model_fusion import fusion_weighted_average, load_expert_models
 
-# 4 Domains from the paper
-DOMAINS = ["algebra", "geometry", "calculus", "statistics"]
+# 5 Domains (4 math + code)
+DOMAINS = ["algebra", "geometry", "calculus", "statistics", "code"]
 BASE_MODEL = "unsloth/Qwen3-0.6B-Base-unsloth-bnb-4bit"
 
 

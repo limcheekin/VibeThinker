@@ -435,7 +435,7 @@ SAFE_BUILTINS = {
 }
 
 # Whitelist of safe modules that can be used in code execution
-SAFE_MODULES = {"math", "numpy"}
+SAFE_MODULES = {"math", "numpy", "collections", "itertools", "re", "heapq"}
 
 
 def _create_safe_globals() -> Dict[str, Any]:
@@ -584,7 +584,7 @@ class CodeRewardCalculator:
 
     def _extract_code(self, text: str) -> str:
         """
-        Extract Python code from markdown code blocks.
+        Extract Python code from markdown code blocks or raw code.
 
         Args:
             text: Text that may contain code blocks
@@ -592,9 +592,28 @@ class CodeRewardCalculator:
         Returns:
             Extracted code or original text
         """
+        import re
+
+        # Try to extract from ```python blocks
         if "```python" in text:
             return text.split("```python")[1].split("```")[0].strip()
-        return text
+
+        # Try to extract from generic ``` blocks (without language tag)
+        if "```" in text:
+            # Find all code blocks
+            pattern = r"```(?:\w+)?\s*\n?(.*?)```"
+            matches = re.findall(pattern, text, re.DOTALL)
+            if matches:
+                # Return the first or largest code block
+                return str(max(matches, key=len)).strip()
+
+        # If no markdown blocks, check if it looks like raw code
+        # (has def keyword or common Python patterns)
+        if "def " in text or "import " in text or "from " in text:
+            return text.strip()
+
+        # Fallback: return as-is
+        return text.strip()
 
 
 if __name__ == "__main__":

@@ -224,11 +224,17 @@ def train_signal_phase_complete(
                 model.eval()
 
                 for problem in prompts:
-                    # Construct Prompt
-                    prompt_text = (
-                        "Solve the following problem step by step:\n\n"
-                        f"{problem}\n\nSolution:"
-                    )
+                    # Construct Prompt (domain-aware)
+                    if reward_type == "code":
+                        prompt_text = (
+                            f"Write a Python function to solve:\n\n"
+                            f"{problem}\n\n```python\n"
+                        )
+                    else:
+                        prompt_text = (
+                            "Solve the following problem step by step:\n\n"
+                            f"{problem}\n\nSolution:"
+                        )
 
                     # Tokenize
                     inputs = tokenizer(prompt_text, return_tensors="pt").to("cuda")
