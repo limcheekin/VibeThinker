@@ -107,9 +107,8 @@ class TestTrainSpecialist:
         mock_trainer.assert_called_once()
         mock_trainer_instance.train.assert_called_once()
 
-        # Verify model was saved
-        mock_model.save_pretrained.assert_called_once()
-        mock_tokenizer.save_pretrained.assert_called_once()
+        # Verify model was saved with merged method
+        mock_model.save_pretrained_merged.assert_called_once()
 
     @patch("train_sft_specialist.SFTTrainer")
     @patch("train_sft_specialist.SFTConfig")

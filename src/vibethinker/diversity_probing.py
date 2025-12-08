@@ -69,16 +69,27 @@ class DiversityProber:
         Args:
             model_path: Path to the model checkpoint
             max_seq_length: Maximum sequence length for the model
+
+        Raises:
+            ValueError: If model loading fails
         """
         print(f"Loading model for probing: {model_path}")
-        self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-            model_path,
-            max_seq_length=max_seq_length,
-            load_in_4bit=True,
-            dtype=None,
-        )
-        FastLanguageModel.for_inference(self.model)
-        self.reward_calc = MGPORewardCalculator()
+        try:
+            self.model, self.tokenizer = FastLanguageModel.from_pretrained(
+                model_path,
+                max_seq_length=max_seq_length,
+                load_in_4bit=True,
+                dtype=None,
+            )
+            FastLanguageModel.for_inference(self.model)
+            self.reward_calc = MGPORewardCalculator()
+        except Exception as e:
+            raise ValueError(
+                f"Failed to load model from {model_path}. "
+                f"Ensure it contains full model weights (not just LoRA adapters). "
+                f"If this is a LoRA checkpoint, use save_pretrained_merged() during training. "
+                f"Original error: {e}"
+            )
 
     def probe_domain(
         self,

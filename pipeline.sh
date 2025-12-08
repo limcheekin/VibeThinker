@@ -53,6 +53,25 @@ validate_checkpoint() {
     echo "✓ Validated $name: $path"
 }
 
+validate_data_files() {
+    local DATA_DIR=$1
+    local DOMAINS=("algebra" "geometry" "calculus" "statistics" "code")
+    
+    echo "Validating domain data files..."
+    
+    for domain in "${DOMAINS[@]}"; do
+        if [ ! -f "$DATA_DIR/${domain}_train.jsonl" ]; then
+            echo "Error: Missing $DATA_DIR/${domain}_train.jsonl"
+            return 1
+        fi
+        if [ ! -f "$DATA_DIR/${domain}_val.jsonl" ]; then
+            echo "Warning: Missing $DATA_DIR/${domain}_val.jsonl"
+        fi
+    done
+    echo "✓ All domain data files validated"
+    return 0
+}
+
 # ==============================================================================
 # PHASE 0: DATA PREPARATION
 # ==============================================================================
@@ -102,9 +121,10 @@ if [ "$MISSING_FILES" = true ]; then
         exit 1
     fi
     echo "✓ Data preparation complete"
-else
-    echo "✓ All domain data files found. Skipping data preparation."
 fi
+
+# Validate all required data files exist before proceeding
+validate_data_files "$DATA_DIR"
 
 # ==============================================================================
 # PHASE 1: SPECTRUM PHASE (SFT + Selection + Fusion)

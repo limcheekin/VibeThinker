@@ -5,17 +5,49 @@ This implements the fusion strategy from the paper where domain specialists
 (algebra, geometry, calculus, statistics) are combined.
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
 from transformers import AutoModelForCausalLM
 
 
-def load_expert_models(expert_paths: List[str], device: str = "cuda") -> List[Any]:
-    """Load all expert models."""
+def load_expert_models(
+    expert_paths: List[str],
+    base_model_path: Optional[str] = None,
+    device: str = "cuda",
+) -> List[Any]:
+    """Load expert models, handling both full models and LoRA adapters.
+
+    Args:
+        expert_paths: List of paths to expert models
+        base_model_path: Optional base model path for LoRA adapter merging
+        device: Device to load models on
+
+    Returns:
+        List of loaded expert models
+    """
     experts: List[Any] = []
     for path in expert_paths:
-        model: Any = AutoModelForCausalLM.from_pretrained(str(path))
+        adapter_config = Path(path) / "adapter_config.json"
+
+        if adapter_config.exists() and base_model_path:
+            # Load as LoRA adapter and merge
+            try:
+                from peft import PeftModel
+
+                base_model: Any = AutoModelForCausalLM.from_pretrained(base_model_path)
+                model: Any = PeftModel.from_pretrained(base_model, path)
+                model = model.merge_and_unload()
+            except ImportError:
+                raise ImportError(
+                    "PEFT library required for LoRA adapter loading. "
+                    "Install with: pip install peft"
+                )
+        else:
+            # Load as full model
+            model = AutoModelForCausalLM.from_pretrained(str(path))
+
         model.to(device)
         model.eval()
         experts.append(model)

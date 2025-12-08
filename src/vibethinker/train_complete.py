@@ -318,8 +318,9 @@ def train_signal_phase_complete(
                     print(f"{'=' * 70}")
 
                     checkpoint_path = f"{output_dir}/checkpoints/step-{global_step}"
-                    model.save_pretrained(checkpoint_path)
-                    tokenizer.save_pretrained(checkpoint_path)
+                    model.save_pretrained_merged(
+                        checkpoint_path, tokenizer, save_method="merged_16bit"
+                    )
 
                     # Visualization
                     if global_step % (config.eval_every * 2) == 0:
@@ -341,8 +342,7 @@ def train_signal_phase_complete(
     print("TRAINING COMPLETE")
     print("=" * 70)
     final_path = f"{output_dir}/final"
-    model.save_pretrained(final_path)
-    tokenizer.save_pretrained(final_path)
+    model.save_pretrained_merged(final_path, tokenizer, save_method="merged_16bit")
     monitor.generate_report("signal_phase_complete")
     monitor.plot_training_curves("signal_phase_complete")
 

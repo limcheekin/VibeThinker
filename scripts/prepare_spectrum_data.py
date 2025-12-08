@@ -914,30 +914,47 @@ def main(
                 )
 
             if (idx + 1) % checkpoint_interval == 0:
-                out_file = os.path.join(
-                    output_dir,
-                    f"spectrum_{vt_domain}_{'flat' if flatten else 'nested'}.jsonl",
-                )
-                with open(out_file, "w", encoding="utf-8") as f:
-                    for entry in domain_out:
+                # Split data into train/val (80/20)
+                train_size = int(len(domain_out) * 0.8)
+                train_data = domain_out[:train_size]
+                val_data = domain_out[train_size:]
+
+                # Write checkpoint files
+                train_file = os.path.join(output_dir, f"{vt_domain}_train.jsonl")
+                with open(train_file, "w", encoding="utf-8") as f:
+                    for entry in train_data:
+                        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+                val_file = os.path.join(output_dir, f"{vt_domain}_val.jsonl")
+                with open(val_file, "w", encoding="utf-8") as f:
+                    for entry in val_data:
                         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
                 logging.info(
-                    "Checkpoint wrote %d domain entries to %s",
-                    len(domain_out),
-                    out_file,
+                    "Checkpoint wrote %d train + %d val entries",
+                    len(train_data),
+                    len(val_data),
                 )
 
-        out_file = os.path.join(
-            output_dir, f"spectrum_{vt_domain}_{'flat' if flatten else 'nested'}.jsonl"
-        )
-        with open(out_file, "w", encoding="utf-8") as f:
-            for entry in domain_out:
+        # Final write with train/val split
+        train_size = int(len(domain_out) * 0.8)
+        train_data = domain_out[:train_size]
+        val_data = domain_out[train_size:]
+
+        train_file = os.path.join(output_dir, f"{vt_domain}_train.jsonl")
+        with open(train_file, "w", encoding="utf-8") as f:
+            for entry in train_data:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+        val_file = os.path.join(output_dir, f"{vt_domain}_val.jsonl")
+        with open(val_file, "w", encoding="utf-8") as f:
+            for entry in val_data:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         logging.info(
-            "Completed domain %s: wrote %d entries to %s",
+            "Completed domain %s: wrote %d train + %d val entries to %s",
             vt_domain,
-            len(domain_out),
-            out_file,
+            len(train_data),
+            len(val_data),
+            output_dir,
         )
 
     logging.info("Done. stats: %s", dict(overall_stats))

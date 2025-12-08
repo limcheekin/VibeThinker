@@ -442,10 +442,36 @@ def _create_safe_globals() -> Dict[str, Any]:
     """
     Create restricted globals for code execution.
 
+    WARNING: This sandbox is NOT fully secure against malicious code.
+    Only use with trusted data sources. For production use, consider:
+    - Docker/container isolation
+    - gVisor or similar sandboxing
+    - Separate VM execution
+    - Code review before execution
+
+    Security measures implemented:
+    - Restricted builtins (no file I/O, no imports, no compile/eval/exec)
+    - Whitelisted safe modules only (math, numpy, collections, itertools, re, heapq)
+    - Process-level isolation via multiprocessing
+    - Timeout enforcement
+
+    Known limitations:
+    - Cannot prevent all code injection attacks
+    - Resource exhaustion still possible
+    - Side-channel attacks not prevented
+
     Returns:
         Dictionary with safe builtins and allowed module imports
     """
-    safe_globals: Dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
+    safe_globals: Dict[str, Any] = {
+        "__builtins__": SAFE_BUILTINS,
+        "__name__": "__restricted__",
+        "__doc__": None,
+    }
+
+    # Block common introspection vectors
+    for blocked in ["__class__", "__bases__", "__subclasses__", "__mro__"]:
+        safe_globals[blocked] = None
 
     # Allow safe module imports
     for module_name in SAFE_MODULES:

@@ -88,7 +88,7 @@ def test_train_domain_specialist(mock_gpu_dependencies):
 
         checkpoint_dir = train_domain_specialist(
             domain="algebra",
-            data_path="data/algebra.jsonl",
+            data_path="data/algebra_train.jsonl",
             base_model="unsloth/Qwen3-0.6B-Base-unsloth-bnb-4bit",
             output_dir="checkpoints",
             max_steps=100,
@@ -118,7 +118,7 @@ def test_train_domain_specialist_failure(mock_gpu_dependencies):
         with pytest.raises(RuntimeError, match="Training failed"):
             train_domain_specialist(
                 domain="algebra",
-                data_path="data/algebra.jsonl",
+                data_path="data/algebra_train.jsonl",
                 base_model="unsloth/Qwen3-0.6B-Base-unsloth-bnb-4bit",
                 output_dir="checkpoints",
                 max_steps=100,
@@ -136,7 +136,7 @@ def test_main_full_pipeline(tmp_path, mock_gpu_dependencies):
     data_dir.mkdir()
 
     for domain in ["algebra", "geometry"]:
-        data_file = data_dir / f"{domain}.jsonl"
+        data_file = data_dir / f"{domain}_train.jsonl"
         with open(data_file, "w") as f:
             for i in range(5):
                 json.dump({"problem": f"P{i}", "answer": f"A{i}"}, f)

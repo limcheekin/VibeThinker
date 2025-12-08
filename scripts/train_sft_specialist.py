@@ -110,9 +110,9 @@ def train_specialist(
     trainer.train()
 
     # 7. Save Final Model
+    # Save merged model (not just LoRA adapters) for fusion compatibility
     final_path = f"{output_dir}/{domain}_specialist/final"
-    model.save_pretrained(final_path)
-    tokenizer.save_pretrained(final_path)
+    model.save_pretrained_merged(final_path, tokenizer, save_method="merged_16bit")
     print(f"Training complete. Checkpoints saved in {output_dir}/{domain}_specialist")
 
 

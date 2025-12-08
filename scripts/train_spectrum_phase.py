@@ -177,7 +177,7 @@ def main() -> int:
 
     # Phase 1: Train Specialists
     for domain in DOMAINS:
-        data_path = f"{args.data_dir}/{domain}.jsonl"
+        data_path = f"{args.data_dir}/{domain}_train.jsonl"
 
         if not os.path.exists(data_path):
             print(f"WARNING: Data file not found: {data_path}")
