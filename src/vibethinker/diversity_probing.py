@@ -34,6 +34,31 @@ def calculate_pass_at_k(n: int, c: int, k: int) -> float:
     return float(1.0 - np.prod(1.0 - k / np.arange(n - c + 1, n + 1)))
 
 
+# Domain-specific prompt templates for improved context
+DOMAIN_PROMPTS = {
+    "algebra": (
+        "Solve the following algebra problem step by step. "
+        "Show your work and box the final answer:\n\n{problem}\n\nSolution:"
+    ),
+    "geometry": (
+        "Solve the following geometry problem using geometric reasoning. "
+        "Draw diagrams if helpful and box the final answer:\n\n{problem}\n\nSolution:"
+    ),
+    "calculus": (
+        "Solve the following calculus problem step by step. "
+        "Show all derivatives, integrals, or limits clearly and box the final answer:\n\n{problem}\n\nSolution:"
+    ),
+    "statistics": (
+        "Solve the following statistics problem step by step. "
+        "Show all calculations and box the final answer:\n\n{problem}\n\nSolution:"
+    ),
+    "code": (
+        "Write a Python function to solve the following problem:\n\n{problem}\n\n```python\n"
+    ),
+    "math": ("Solve the following problem step by step:\n\n{problem}\n\nSolution:"),
+}
+
+
 class DiversityProber:
     """Probe model diversity using Pass@K metric."""
 
@@ -79,17 +104,10 @@ class DiversityProber:
         total_pass_at_1 = 0.0
 
         for item in tqdm(problems, desc="Probing"):
-            # Domain-aware prompt construction
-            if domain == "code":
-                prompt_text = (
-                    f"Write a Python function to solve:\n\n"
-                    f"{item['problem']}\n\n```python\n"
-                )
-            else:
-                prompt_text = (
-                    f"Solve the following problem step by step:\n\n"
-                    f"{item['problem']}\n\nSolution:"
-                )
+            # Domain-aware prompt construction using templates
+            prompt_template = DOMAIN_PROMPTS.get(domain, DOMAIN_PROMPTS["math"])
+            prompt_text = prompt_template.format(problem=item["problem"])
+
             inputs = self.tokenizer([prompt_text], return_tensors="pt").to("cuda")
 
             # Generate N solutions (spectrum)

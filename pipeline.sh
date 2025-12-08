@@ -17,6 +17,7 @@ DIVERSITY_K="${DIVERSITY_K:-8}"
 NUM_GENERATIONS="${NUM_GENERATIONS:-16}"
 MAX_SEQ_LENGTH_STAGE1="${MAX_SEQ_LENGTH_STAGE1:-4096}"
 MAX_SEQ_LENGTH_STAGE2="${MAX_SEQ_LENGTH_STAGE2:-16384}"
+MAX_SEQ_LENGTH_STAGE3="${MAX_SEQ_LENGTH_STAGE3:-32768}"
 
 # Data preparation settings
 DATA_PREP_MAX_PROBLEMS="${DATA_PREP_MAX_PROBLEMS:-500}"
@@ -165,10 +166,27 @@ python "$TRAIN_SCRIPT" \
 STAGE2_MODEL="$STAGE2_OUT/final"
 validate_checkpoint "$STAGE2_MODEL" "Stage 2 Model"
 
-# --- Stage 3: Code Generalization ---
+# --- Stage 3: Math RL (Long Context 32k) ---
 echo ""
-echo ">>> [Phase 2.3] Signal RL - Code Domain"
-FINAL_OUT="$OUTPUT_ROOT/phase2_stage3_code"
+echo ">>> [Phase 2.3] Signal RL - Expanding Context to 32k"
+STAGE3_OUT="$OUTPUT_ROOT/phase2_stage3_32k"
+
+python "$TRAIN_SCRIPT" \
+    --spectrum-path "$STAGE2_MODEL" \
+    --output-dir "$STAGE3_OUT" \
+    --gpu-type "H100" \
+    --max-steps "$SIGNAL_STEPS" \
+    --max-seq-length "$MAX_SEQ_LENGTH_STAGE3" \
+    --train-data "$DATA_DIR/algebra_train.jsonl" \
+    --val-data "$DATA_DIR/algebra_val.jsonl"
+
+STAGE3_MODEL="$STAGE3_OUT/final"
+validate_checkpoint "$STAGE3_MODEL" "Stage 3 Model"
+
+# --- Stage 4: Code Generalization ---
+echo ""
+echo ">>> [Phase 2.4] Signal RL - Code Domain"
+FINAL_OUT="$OUTPUT_ROOT/phase2_stage4_code"
 
 # Code RL with APPS dataset
 CODE_TRAIN_DATA="$DATA_DIR/apps_train.jsonl"
@@ -180,7 +198,7 @@ if [ ! -f "$CODE_TRAIN_DATA" ]; then
 fi
 
 python "$TRAIN_SCRIPT" \
-    --spectrum-path "$STAGE2_MODEL" \
+    --spectrum-path "$STAGE3_MODEL" \
     --output-dir "$FINAL_OUT" \
     --gpu-type "H100" \
     --max-steps "$SIGNAL_STEPS" \
@@ -203,4 +221,5 @@ echo "  SPECTRUM_STEPS: $SPECTRUM_STEPS"
 echo "  SIGNAL_STEPS: $SIGNAL_STEPS"
 echo "  MAX_SEQ_LENGTH (Stage 1): $MAX_SEQ_LENGTH_STAGE1"
 echo "  MAX_SEQ_LENGTH (Stage 2): $MAX_SEQ_LENGTH_STAGE2"
+echo "  MAX_SEQ_LENGTH (Stage 3): $MAX_SEQ_LENGTH_STAGE3"
 echo "====================================================================="

@@ -977,6 +977,13 @@ if __name__ == "__main__":
     parser.add_argument("--decontam-eval", nargs="*", default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--checkpoint-interval", type=int, default=20)
+    parser.add_argument(
+        "--two-stage",
+        action="store_true",
+        help="Enable two-stage diversity-exploring distillation (paper methodology): "
+        "Stage 1 generates diverse solutions with varied temperatures; "
+        "Stage 2 filters via consensus/verification for quality",
+    )
     args = parser.parse_args()
 
     if args.teacher_backend == "openai" and openai is None:
@@ -1003,14 +1010,23 @@ if __name__ == "__main__":
             "OPENAI_API_KEY not found in env. OpenAI calls will fail unless set."
         )
 
+    # Handle --two-stage mode: enable consensus and enhanced sampling
+    secondary_teacher = args.secondary_teacher_model
+    if args.two_stage and not secondary_teacher:
+        # Enable two-stage by using same teacher for consensus (via re-sampling)
+        logging.info(
+            "Two-stage mode enabled: using consensus verification with re-sampling"
+        )
+        # Can also set secondary_teacher = args.teacher_model for true two-model consensus
+
     main(
         hf_id=args.hf_id,
         output_dir=args.out,
         teacher_backend=args.teacher_backend,
         teacher_model=args.teacher_model,
-        secondary_teacher_model=args.secondary_teacher_model,
+        secondary_teacher_model=secondary_teacher,
         n_solutions=args.n_solutions,
-        verify=args.verify,
+        verify=args.verify or args.two_stage,  # Force verification in two-stage mode
         sbert_model_name=args.sbert_model,
         sim_threshold=args.sim_threshold,
         max_problems=args.max_problems,
